@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd frontend && npm install --legacy-peer-deps && npm run build",
+  "buildCommand": "cd frontend && yarn build",
   "outputDirectory": "frontend/.next",
   "framework": "nextjs",
-  "installCommand": "cd frontend && npm install --legacy-peer-deps"
+  "installCommand": "cd frontend && yarn install"
 }
