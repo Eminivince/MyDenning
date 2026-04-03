@@ -1,4 +1,9 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// In production, API calls go through Next.js rewrites (/api/v1/* -> backend)
+// so the browser never needs to know the backend URL directly.
+// NEXT_PUBLIC_API_URL is only needed for local dev without Docker.
+const API_BASE = typeof window !== "undefined"
+  ? (process.env.NEXT_PUBLIC_API_URL || "")  // browser: use rewrites (empty = same origin)
+  : (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");  // server: use internal docker network
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: Record<string, any> | FormData;
