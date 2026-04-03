@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // output: 'standalone' is only for Docker — Vercel handles its own build output
+  ...(process.env.DOCKER_BUILD === '1' ? { output: 'standalone' } : {}),
   async rewrites() {
     // Proxy /api/* requests to the FastAPI backend.
     // In Docker: INTERNAL_API_URL=http://api:8000
