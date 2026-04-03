@@ -284,43 +284,72 @@ def get_source_registry() -> SourceRegistry:
 
 
 def _register_all_adapters(registry: SourceRegistry) -> None:
-    """Register all available adapters. Each adapter checks its own config/API keys."""
+    """Register all available adapters.
+
+    Priority order based on verified API availability:
+    1. Government APIs with documented, stable endpoints
+    2. LII APIs backed by academic institutions
+    3. API-key-gated free sources
+    """
     from app.core.config import get_settings
     settings = get_settings()
 
-    # --- Free / Open APIs (always register) ---
+    # --- P0: Primary sources (verified stable APIs) ---
 
+    # US case law — CourtListener is the primary US source. It now includes all
+    # Harvard Caselaw Access Project data (Harvard CAP API was deprecated in 2024).
     from app.services.legal_sources.adapters.courtlistener import CourtListenerAdapter
     registry.register(CourtListenerAdapter())
 
-    from app.services.legal_sources.adapters.legislation_gov_uk import LegislationGovUKAdapter
-    registry.register(LegislationGovUKAdapter())
-
-    from app.services.legal_sources.adapters.eur_lex import EURLexAdapter
-    registry.register(EURLexAdapter())
-
+    # US federal regulations — fully open, no auth needed
     from app.services.legal_sources.adapters.ecfr import ECFRAdapter
     registry.register(ECFRAdapter())
 
-    from app.services.legal_sources.adapters.harvard_caselaw import HarvardCaselawAdapter
-    registry.register(HarvardCaselawAdapter())
+    # African legislation (20+ countries including Nigeria) — this is THE source.
+    # NigeriaLII, SAFLII, KenyaLII, GhaLII all feed from Laws.Africa data.
+    from app.services.legal_sources.adapters.laws_africa import LawsAfricaAdapter
+    registry.register(LawsAfricaAdapter())
 
-    from app.services.legal_sources.adapters.african_lii import AfricanLIIAdapter
-    registry.register(AfricanLIIAdapter())
+    # UK legislation — official government API, open access
+    from app.services.legal_sources.adapters.legislation_gov_uk import LegislationGovUKAdapter
+    registry.register(LegislationGovUKAdapter())
 
-    from app.services.legal_sources.adapters.nigeria_lii import NigeriaLIIAdapter
-    registry.register(NigeriaLIIAdapter())
+    # UK case law — National Archives, Open Justice Licence (commercial reuse OK)
+    from app.services.legal_sources.adapters.uk_caselaw import UKCaseLawAdapter
+    registry.register(UKCaseLawAdapter())
 
-    from app.services.legal_sources.adapters.kenya_law import KenyaLawAdapter
-    registry.register(KenyaLawAdapter())
+    # EU legislation + CJEU case law
+    from app.services.legal_sources.adapters.eur_lex import EURLexAdapter
+    registry.register(EURLexAdapter())
 
+    # --- P1: Secondary sources (API-key-gated but free) ---
+
+    # Canada — requires free API key from developer.canlii.org
     from app.services.legal_sources.adapters.canlii import CanLIIAdapter
     registry.register(CanLIIAdapter())
 
-    from app.services.legal_sources.adapters.austlii import AustLIIAdapter
-    registry.register(AustLIIAdapter())
-
+    # India — requires API key (apply at indiankanoon.org/api)
     from app.services.legal_sources.adapters.indian_kanoon import IndianKanoonAdapter
     registry.register(IndianKanoonAdapter())
+
+    # --- P2: Best-effort sources (work but less stable/documented) ---
+
+    # Nigeria case law via NigeriaLII (web-based, no official API — best effort)
+    from app.services.legal_sources.adapters.nigeria_lii import NigeriaLIIAdapter
+    registry.register(NigeriaLIIAdapter())
+
+    # Pan-African case law via AfricanLII (web-based, best effort)
+    from app.services.legal_sources.adapters.african_lii import AfricanLIIAdapter
+    registry.register(AfricanLIIAdapter())
+
+    # Kenya case law (web-based, best effort)
+    from app.services.legal_sources.adapters.kenya_law import KenyaLawAdapter
+    registry.register(KenyaLawAdapter())
+
+    # Australia legislation via Federal Register of Legislation
+    # Note: AustLII explicitly blocks programmatic access — we only use the
+    # Federal Register of Legislation API which is open
+    from app.services.legal_sources.adapters.austlii import AustLIIAdapter
+    registry.register(AustLIIAdapter())
 
     logger.info("all_adapters_registered", count=len(registry._adapters))

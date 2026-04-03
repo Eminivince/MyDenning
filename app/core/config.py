@@ -64,9 +64,9 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 20
     rerank_top_k: int = 10
 
-    # External Legal Source API Keys (optional — adapters work without keys but with lower rate limits)
+    # External Legal Source API Keys (optional — adapters degrade gracefully without them)
     courtlistener_api_token: str = ""  # Free: register at courtlistener.com
-    caselaw_api_key: str = ""  # Free: register at case.law (Harvard)
+    laws_africa_api_token: str = ""  # Free: register at edit.laws.africa
     canlii_api_key: str = ""  # Free: register at developer.canlii.org
     indian_kanoon_api_key: str = ""  # Apply at indiankanoon.org/api
 

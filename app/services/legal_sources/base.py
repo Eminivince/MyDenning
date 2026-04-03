@@ -15,6 +15,7 @@ class SourceContentType(str, enum.Enum):
     SECONDARY = "secondary"
     BILL = "bill"
     CONSTITUTION = "constitution"
+    EXECUTIVE_ORDER = "executive_order"
 
 
 class CourtLevel(int, enum.Enum):
