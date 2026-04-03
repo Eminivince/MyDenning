@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 20
     rerank_top_k: int = 10
 
+    # External Legal Source API Keys (optional — adapters work without keys but with lower rate limits)
+    courtlistener_api_token: str = ""  # Free: register at courtlistener.com
+    caselaw_api_key: str = ""  # Free: register at case.law (Harvard)
+    canlii_api_key: str = ""  # Free: register at developer.canlii.org
+    indian_kanoon_api_key: str = ""  # Apply at indiankanoon.org/api
+
 
 @lru_cache
 def get_settings() -> Settings:
