@@ -43,8 +43,8 @@ function IssueCard({ issue, index }: { issue: IssueAnalysis; index: number }) {
                 {issue.authority.map((a, i) => (
                   <li key={i} className="flex items-center gap-2">
                     <BookOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
-                    <span>{a.citation}</span>
-                    {a.binding && <Badge variant="outline" className="text-[10px]">Binding</Badge>}
+                    <span>{a.citation_text}</span>
+                    {a.authority_level === "binding" && <Badge variant="outline" className="text-[10px]">Binding</Badge>}
                   </li>
                 ))}
               </ul>
