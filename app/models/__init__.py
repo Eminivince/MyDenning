@@ -7,6 +7,12 @@ from app.models.analysis import AnalysisResult, ClauseExtraction, DeviationRepor
 from app.models.audit import AuditLog
 from app.models.memory import OrganizationPreference, MatterMemory
 from app.models.conversation import Conversation, ConversationMessage
+from app.models.legal_features import (
+    PrivilegeTag, PrivilegeLog,
+    ConflictParty, ConflictMatterParty, ConflictCheck,
+    MonitoredRegulation, RegulatoryAlert,
+    CitationValidation,
+)
 
 __all__ = [
     "User", "Organization", "OrganizationMember",
@@ -18,4 +24,8 @@ __all__ = [
     "AuditLog",
     "OrganizationPreference", "MatterMemory",
     "Conversation", "ConversationMessage",
+    "PrivilegeTag", "PrivilegeLog",
+    "ConflictParty", "ConflictMatterParty", "ConflictCheck",
+    "MonitoredRegulation", "RegulatoryAlert",
+    "CitationValidation",
 ]

@@ -1,0 +1,228 @@
+"""Models for privilege tagging, conflict checking, and regulatory monitoring."""
+
+import enum
+import uuid
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base, TimestampMixin, UUIDMixin
+
+
+# --- Privilege Tagging ---
+
+class PrivilegeType(str, enum.Enum):
+    ATTORNEY_CLIENT = "attorney_client"
+    WORK_PRODUCT = "work_product"
+    COMMON_INTEREST = "common_interest"
+    LITIGATION_HOLD = "litigation_hold"
+    CONFIDENTIAL = "confidential"
+    RESTRICTED = "restricted"
+
+
+class PrivilegeStatus(str, enum.Enum):
+    ASSERTED = "asserted"
+    WAIVED = "waived"
+    DISPUTED = "disputed"
+    UNDER_REVIEW = "under_review"
+
+
+class PrivilegeTag(Base, UUIDMixin, TimestampMixin):
+    """Privilege and confidentiality markers on documents and analysis results."""
+    __tablename__ = "privilege_tags"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    matter_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("matters.id", ondelete="CASCADE"), index=True)
+    analysis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("analysis_results.id", ondelete="CASCADE"), index=True)
+
+    privilege_type: Mapped[PrivilegeType] = mapped_column(Enum(PrivilegeType), nullable=False, index=True)
+    status: Mapped[PrivilegeStatus] = mapped_column(Enum(PrivilegeStatus), default=PrivilegeStatus.ASSERTED)
+
+    # Who and why
+    asserted_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    basis: Mapped[str] = mapped_column(Text, nullable=False)  # legal basis for the assertion
+    scope_description: Mapped[str | None] = mapped_column(Text)  # what specifically is privileged
+    attorney_name: Mapped[str | None] = mapped_column(String(255))
+    client_name: Mapped[str | None] = mapped_column(String(255))
+
+    # Waiver tracking
+    waived_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    waived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    waiver_reason: Mapped[str | None] = mapped_column(Text)
+    waiver_scope: Mapped[str | None] = mapped_column(Text)  # partial or full waiver
+
+    # Review
+    reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_notes: Mapped[str | None] = mapped_column(Text)
+
+    metadata: Mapped[dict | None] = mapped_column(JSONB)
+
+
+class PrivilegeLog(Base, UUIDMixin, TimestampMixin):
+    """Privilege log entries for litigation hold / discovery responses."""
+    __tablename__ = "privilege_log_entries"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    matter_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+    privilege_tag_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("privilege_tags.id", ondelete="CASCADE"), nullable=False)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL"))
+
+    # Standard privilege log fields
+    document_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    document_type_description: Mapped[str] = mapped_column(String(255), nullable=False)
+    author: Mapped[str | None] = mapped_column(String(500))
+    recipients: Mapped[list | None] = mapped_column(JSONB)
+    subject_matter: Mapped[str] = mapped_column(Text, nullable=False)
+    privilege_claimed: Mapped[str] = mapped_column(String(255), nullable=False)
+    basis_for_privilege: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+# --- Conflict Checking ---
+
+class ConflictStatus(str, enum.Enum):
+    NO_CONFLICT = "no_conflict"
+    POTENTIAL_CONFLICT = "potential_conflict"
+    ACTUAL_CONFLICT = "actual_conflict"
+    WAIVED = "waived"
+    CLEARED = "cleared"
+
+
+class ConflictParty(Base, UUIDMixin, TimestampMixin):
+    """Known parties tracked across matters for conflict detection."""
+    __tablename__ = "conflict_parties"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    normalized_name: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    aliases: Mapped[list | None] = mapped_column(JSONB)  # known aliases, trading names, subsidiaries
+    party_type: Mapped[str | None] = mapped_column(String(50))  # individual, company, government, trust
+    jurisdiction: Mapped[str | None] = mapped_column(String(100))
+    registration_number: Mapped[str | None] = mapped_column(String(100))
+    metadata: Mapped[dict | None] = mapped_column(JSONB)
+
+
+class ConflictMatterParty(Base, UUIDMixin, TimestampMixin):
+    """Links parties to matters with their role — the core data for conflict detection."""
+    __tablename__ = "conflict_matter_parties"
+
+    matter_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+    party_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("conflict_parties.id", ondelete="CASCADE"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(100), nullable=False)  # client, counterparty, opposing_counsel, co-party, witness, guarantor
+    is_adverse: Mapped[bool] = mapped_column(Boolean, default=False)  # True if this party is adverse to our client
+
+
+class ConflictCheck(Base, UUIDMixin, TimestampMixin):
+    """Record of a conflict-of-interest check."""
+    __tablename__ = "conflict_checks"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    matter_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("matters.id", ondelete="SET NULL"), index=True)
+    checked_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    # What was checked
+    party_names_checked: Mapped[list] = mapped_column(JSONB, nullable=False)
+    status: Mapped[ConflictStatus] = mapped_column(Enum(ConflictStatus), nullable=False)
+
+    # Results
+    conflicts_found: Mapped[list | None] = mapped_column(JSONB)  # list of {matter_id, matter_title, party_name, role, adverse, description}
+    resolution: Mapped[str | None] = mapped_column(Text)
+    resolved_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Approval
+    approved_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# --- Regulatory Change Monitoring ---
+
+class MonitoredRegulation(Base, UUIDMixin, TimestampMixin):
+    """Regulations, statutes, or legal areas being monitored for changes."""
+    __tablename__ = "monitored_regulations"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    jurisdiction: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)  # statute, regulation, case_law, guidance
+    source_identifier: Mapped[str | None] = mapped_column(String(500))  # citation or reference
+    source_adapter: Mapped[str | None] = mapped_column(String(100))  # which legal source adapter to use
+
+    # Monitoring config
+    keywords: Mapped[list | None] = mapped_column(JSONB)  # keywords to watch for
+    topics: Mapped[list | None] = mapped_column(JSONB)
+    check_frequency_hours: Mapped[int] = mapped_column(Integer, default=24)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # State
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_change_detected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Link to matters affected
+    affected_matter_ids: Mapped[list | None] = mapped_column(JSONB)
+
+    alerts: Mapped[list["RegulatoryAlert"]] = relationship(back_populates="regulation", cascade="all, delete-orphan")
+
+
+class RegulatoryAlert(Base, UUIDMixin, TimestampMixin):
+    """An alert generated when a monitored regulation changes."""
+    __tablename__ = "regulatory_alerts"
+
+    regulation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("monitored_regulations.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    alert_type: Mapped[str] = mapped_column(String(50), nullable=False)  # new_law, amendment, repeal, new_case, guidance_update
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    impact_assessment: Mapped[str | None] = mapped_column(Text)
+    risk_level: Mapped[str | None] = mapped_column(String(20))  # critical, high, medium, low
+
+    source_url: Mapped[str | None] = mapped_column(String(1000))
+    source_citation: Mapped[str | None] = mapped_column(String(500))
+    source_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Action tracking
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    actioned_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    actioned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    action_notes: Mapped[str | None] = mapped_column(Text)
+
+    affected_matter_ids: Mapped[list | None] = mapped_column(JSONB)
+
+    regulation: Mapped["MonitoredRegulation"] = relationship(back_populates="alerts")
+
+
+# --- Citation Validation ---
+
+class CitationValidation(Base, UUIDMixin, TimestampMixin):
+    """Record of a good-law check on a citation."""
+    __tablename__ = "citation_validations"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    checked_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+
+    citation: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    jurisdiction: Mapped[str | None] = mapped_column(String(100))
+
+    is_good_law: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    treatment: Mapped[str] = mapped_column(String(50), nullable=False)  # positive, negative, cautionary, overruled, repealed, amended, unknown
+    negative_treatment: Mapped[str | None] = mapped_column(Text)  # description of negative treatment
+    overruled_by: Mapped[str | None] = mapped_column(String(500))
+    distinguished_by: Mapped[list | None] = mapped_column(JSONB)
+    followed_by_count: Mapped[int] = mapped_column(Integer, default=0)
+    cited_by_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    source_adapter: Mapped[str | None] = mapped_column(String(100))
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # cache expiry
+
+    # Link to analysis that used this citation
+    analysis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("analysis_results.id", ondelete="SET NULL"))
+
+    raw_result: Mapped[dict | None] = mapped_column(JSONB)

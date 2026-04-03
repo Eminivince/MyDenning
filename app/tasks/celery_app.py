@@ -35,6 +35,10 @@ celery_app.conf.update(
             "task": "app.tasks.monitoring_tasks.sync_elasticsearch",
             "schedule": 300.0,  # every 5 min
         },
+        "check-regulatory-changes": {
+            "task": "app.tasks.monitoring_tasks.check_regulatory_changes",
+            "schedule": 3600.0 * 6,  # every 6 hours
+        },
     },
 )
 

@@ -111,3 +111,21 @@ def sync_elasticsearch():
             logger.info("task_elasticsearch_sync_completed", documents=len(documents))
 
     _run_async(_sync())
+
+
+@celery_app.task
+def check_regulatory_changes():
+    """Check all monitored regulations for changes. Runs every 6 hours via beat."""
+    logger.info("task_regulatory_check_started")
+
+    async def _check():
+        from app.db.session import async_session_factory
+        from app.services.legal_features.regulatory_monitor import RegulatoryMonitorService
+
+        async with async_session_factory() as db:
+            service = RegulatoryMonitorService(db)
+            total = await service.check_all_due()
+            await db.commit()
+            logger.info("task_regulatory_check_completed", regulations_checked=total)
+
+    _run_async(_check())
