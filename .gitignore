@@ -37,3 +37,4 @@ storage/
 # Celery
 celerybeat-schedule
 celerybeat.pid
+node_modules/
