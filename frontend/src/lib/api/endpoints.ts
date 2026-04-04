@@ -123,6 +123,9 @@ export const legalFeatures = {
     counterparty_name?: string; matter_id?: string;
     priorities?: string[]; deal_context?: string;
   }) => api.post<any>("/negotiation/strategy", data),
+  clauseLibrarySearch: (params?: Record<string, any>) => api.get<any>("/clause-library/search", params),
+  clauseLibraryBenchmarks: () => api.get<any>("/clause-library/benchmarks"),
+  clauseLibraryInsights: (clauseType: string) => api.get<any>(`/clause-library/insights/${clauseType}`),
   regulatoryMonitors: () => api.get<any[]>("/regulatory/monitors"),
   createMonitor: (data: any) => api.post<any>("/regulatory/monitors", data),
   triggerCheck: (monitorId: string) => api.post<any>(`/regulatory/monitors/${monitorId}/check`),

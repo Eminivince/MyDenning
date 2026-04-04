@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { playbooks } from "@/lib/api/endpoints";
-import { Plus, BookOpen, Loader2, ChevronDown, ChevronRight, Download, Globe, Shield } from "lucide-react";
+import { playbooks, legalFeatures } from "@/lib/api/endpoints";
+import { Plus, BookOpen, Loader2, ChevronDown, ChevronRight, Download, Globe, Shield, Library, BarChart3, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 function CreatePlaybookDialog() {
@@ -93,6 +93,125 @@ function TemplateCard({ template }: { template: any }) {
   );
 }
 
+function ClauseLibraryTab() {
+  const { data: benchmarks, isLoading } = useQuery({ queryKey: ["clause-benchmarks"], queryFn: () => legalFeatures.clauseLibraryBenchmarks() });
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const { data: insights } = useQuery({
+    queryKey: ["clause-insights", selectedType],
+    queryFn: () => legalFeatures.clauseLibraryInsights(selectedType!),
+    enabled: !!selectedType,
+  });
+
+  if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (!benchmarks || benchmarks.total_clauses === 0) {
+    return (
+      <div className="flex flex-col items-center py-16 text-center">
+        <Library className="mb-3 h-10 w-10 text-muted-foreground/50" />
+        <p className="text-sm text-muted-foreground">No clauses in library yet</p>
+        <p className="mt-1 text-xs text-muted-foreground">Review documents to start building your clause library.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-3">
+        <Card><CardContent className="p-3 text-center"><div className="text-2xl font-bold">{benchmarks.total_clauses}</div><div className="text-[11px] text-muted-foreground">Total Clauses</div></CardContent></Card>
+        <Card><CardContent className="p-3 text-center"><div className="text-2xl font-bold">{benchmarks.total_documents_reviewed}</div><div className="text-[11px] text-muted-foreground">Documents Reviewed</div></CardContent></Card>
+        <Card><CardContent className="p-3 text-center"><div className="text-2xl font-bold">{benchmarks.standard_clauses}</div><div className="text-[11px] text-muted-foreground">Standard</div></CardContent></Card>
+        <Card><CardContent className="p-3 text-center"><div className="text-2xl font-bold text-amber-600">{benchmarks.non_standard_clauses}</div><div className="text-[11px] text-muted-foreground">Non-Standard</div></CardContent></Card>
+      </div>
+
+      {/* Risk distribution */}
+      {benchmarks.risk_distribution?.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Risk Distribution</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              {benchmarks.risk_distribution.map((r: any) => (
+                <div key={r.risk_level} className="flex-1 rounded-md border p-2 text-center">
+                  <div className={`text-lg font-bold ${r.risk_level === "critical" || r.risk_level === "high" ? "text-red-500" : r.risk_level === "medium" ? "text-amber-500" : ""}`}>
+                    {r.count}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground capitalize">{r.risk_level}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Most risky clause types */}
+      {benchmarks.most_risky_clause_types?.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><AlertTriangle className="h-4 w-4" />Highest Risk Clause Types</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-1.5">
+              {benchmarks.most_risky_clause_types.map((r: any) => (
+                <div key={r.clause_type} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                  <span className="capitalize">{r.clause_type.replace(/_/g, " ")}</span>
+                  <Badge variant="destructive" className="text-[10px]">{r.high_risk_count} high/critical</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Clause type distribution — clickable for insights */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Clause Types (click for details)</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {benchmarks.clause_type_distribution?.map((ct: any) => (
+              <button
+                key={ct.clause_type}
+                onClick={() => setSelectedType(selectedType === ct.clause_type ? null : ct.clause_type)}
+                className={`rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-secondary ${selectedType === ct.clause_type ? "bg-secondary border-primary" : ""}`}
+              >
+                <span className="capitalize">{ct.clause_type.replace(/_/g, " ")}</span>
+                <span className="ml-1.5 text-muted-foreground">({ct.count})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Insights panel */}
+          {insights && (
+            <div className="mt-4 rounded-md border bg-secondary/30 p-4 space-y-3">
+              <h4 className="text-sm font-semibold capitalize">{insights.clause_type.replace(/_/g, " ")} — {insights.total_instances} instances</h4>
+              <div className="flex gap-4 text-xs">
+                <span>Standard: {insights.standard_count}</span>
+                <span>Unusual: {insights.unusual_count} ({insights.unusual_percentage}%)</span>
+              </div>
+              {insights.risk_breakdown && (
+                <div className="flex gap-2">
+                  {Object.entries(insights.risk_breakdown).map(([level, count]) => (
+                    <Badge key={level} variant={level === "high" || level === "critical" ? "destructive" : level === "medium" ? "warning" : "secondary"} className="text-[10px]">
+                      {level}: {count as number}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {insights.recent_examples?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Recent examples:</p>
+                  {insights.recent_examples.slice(0, 3).map((ex: any, i: number) => (
+                    <div key={i} className="rounded border p-2 mb-1 text-xs">
+                      <span className="text-muted-foreground">{ex.document} — </span>
+                      {ex.text.slice(0, 150)}...
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function PlaybooksPage() {
   const { data: myPlaybooks, isLoading } = useQuery({ queryKey: ["playbooks"], queryFn: () => playbooks.list() });
   const { data: templateList, isLoading: templatesLoading } = useQuery({ queryKey: ["playbook-templates"], queryFn: () => playbooks.templates() });
@@ -109,6 +228,7 @@ export default function PlaybooksPage() {
         <TabsList>
           <TabsTrigger value="my-playbooks">My Playbooks ({myPlaybooks?.length || 0})</TabsTrigger>
           <TabsTrigger value="templates">Templates ({templateList?.length || 0})</TabsTrigger>
+          <TabsTrigger value="clause-library" className="gap-1"><Library className="h-3.5 w-3.5" />Clause Library</TabsTrigger>
         </TabsList>
 
         <TabsContent value="my-playbooks" className="space-y-3 pt-4">
@@ -173,6 +293,10 @@ export default function PlaybooksPage() {
               ))}
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="clause-library" className="pt-4">
+          <ClauseLibraryTab />
         </TabsContent>
       </Tabs>
     </div>

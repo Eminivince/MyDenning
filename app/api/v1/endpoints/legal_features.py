@@ -403,6 +403,59 @@ async def approve_conflict_clearance(
     return {"id": str(check.id), "approved": True, "approved_at": check.approved_at.isoformat()}
 
 
+# ===================== CLAUSE LIBRARY =====================
+
+@router.get("/clause-library/search")
+async def search_clause_library(
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+    clause_type: str | None = None,
+    risk_level: str | None = None,
+    q: str | None = None,
+    jurisdiction: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """Search the clause library across all reviewed documents.
+
+    Every contract you review adds to this library. Search by clause type,
+    risk level, jurisdiction, or free text.
+    """
+    from app.services.legal_features.clause_library import ClauseLibraryService
+    service = ClauseLibraryService(db)
+    return await service.search_clauses(org.id, clause_type, risk_level, q, None, jurisdiction, page, page_size)
+
+
+@router.get("/clause-library/benchmarks")
+async def get_market_benchmarks(
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Get market intelligence from your clause library.
+
+    Returns: clause type distribution, risk breakdown, standard vs unusual ratios,
+    most risky clause types, and jurisdiction coverage.
+    """
+    from app.services.legal_features.clause_library import ClauseLibraryService
+    service = ClauseLibraryService(db)
+    return await service.get_market_benchmarks(org.id)
+
+
+@router.get("/clause-library/insights/{clause_type}")
+async def get_clause_type_insights(
+    clause_type: str,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Deep dive into a specific clause type — risk breakdown, examples, standard vs unusual."""
+    from app.services.legal_features.clause_library import ClauseLibraryService
+    service = ClauseLibraryService(db)
+    return await service.get_clause_type_insights(org.id, clause_type)
+
+
 # ===================== NEGOTIATION =====================
 
 @router.post("/negotiation/strategy")
