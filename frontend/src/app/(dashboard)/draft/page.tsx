@@ -7,9 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { analysis } from "@/lib/api/endpoints";
-import { PenTool, Loader2, Copy, Check } from "lucide-react";
+import { PenTool, Loader2, Copy, Check, Download } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const DRAFT_TYPES = [
   { value: "memo", label: "Legal Memo" },
@@ -91,6 +102,21 @@ export default function DraftPage() {
                 {copied ? <Check className="mr-1 h-3.5 w-3.5" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
                 {copied ? "Copied" : "Copy"}
               </Button>
+              {result.id && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const { blob, filename } = await analysis.exportDocx(result.id);
+                      triggerDownload(blob, filename);
+                      toast.success("Downloaded as Word document");
+                    } catch { toast.error("Export failed"); }
+                  }}
+                >
+                  <Download className="mr-1 h-3.5 w-3.5" />Word
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>

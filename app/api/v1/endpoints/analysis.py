@@ -1,6 +1,7 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import Response
 
 from app.api.deps import CurrentOrg, CurrentUser, DB
 from app.schemas.analysis import (
@@ -231,4 +232,66 @@ async def generate_issue_checklist(
         organization_id=org.id,
         user_id=user.id,
         document_ids=document_ids,
+    )
+
+
+# ===================== EXPORT TO .DOCX =====================
+
+@router.get("/export/{analysis_id}")
+async def export_analysis(
+    analysis_id: uuid.UUID,
+    format: str = Query("docx", regex="^(docx)$"),
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Export any analysis result as a .docx file.
+
+    Supports: drafts, reviews, redlines, risk matrices, and privilege logs.
+    """
+    from app.models.analysis import AnalysisResult, AnalysisType
+    from app.services.output.export import ExportService
+
+    result = await db.get(AnalysisResult, analysis_id)
+    if not result or result.organization_id != org.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis not found")
+
+    exporter = ExportService()
+    data = result.result or {}
+
+    if result.analysis_type == AnalysisType.MEMO_DRAFT:
+        docx_bytes = exporter.export_draft(data)
+        filename = f"draft-{result.analysis_type.value}-{str(analysis_id)[:8]}.docx"
+    elif result.analysis_type == AnalysisType.CLAUSE_EXTRACTION:
+        doc_title = ""
+        if result.document_id:
+            from app.models.document import Document
+            doc = await db.get(Document, result.document_id)
+            doc_title = doc.title if doc else ""
+        docx_bytes = exporter.export_review(data, doc_title)
+        filename = f"review-{str(analysis_id)[:8]}.docx"
+    elif result.analysis_type == AnalysisType.DOCUMENT_COMPARISON:
+        docx_bytes = exporter.export_redline(data)
+        filename = f"redline-{str(analysis_id)[:8]}.docx"
+    elif result.analysis_type == AnalysisType.RISK_ASSESSMENT:
+        doc_title = ""
+        if result.document_id:
+            from app.models.document import Document
+            doc = await db.get(Document, result.document_id)
+            doc_title = doc.title if doc else ""
+        docx_bytes = exporter.export_risk_matrix(data, doc_title)
+        filename = f"risk-matrix-{str(analysis_id)[:8]}.docx"
+    else:
+        # Generic: export as a draft-style document
+        docx_bytes = exporter.export_draft({
+            "draft_type": result.analysis_type.value,
+            "content": result.summary or str(data),
+            "confidence_score": result.confidence_score,
+        })
+        filename = f"analysis-{str(analysis_id)[:8]}.docx"
+
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -42,6 +42,25 @@ export const analysis = {
   deadlines: (documentId: string, matterId?: string) =>
     api.post<any>(`/analysis/deadlines/${documentId}`, undefined),
   riskMatrix: (documentId: string) => api.post<any>(`/analysis/risk-matrix/${documentId}`),
+  exportDocx: (analysisId: string) => {
+    // Direct download — can't use the standard api client since we need a blob
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const orgId = typeof window !== "undefined" ? localStorage.getItem("organization_id") : null;
+    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    return fetch(`${base}/api/v1/analysis/export/${analysisId}?format=docx`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(orgId ? { "X-Organization-ID": orgId } : {}),
+      },
+    }).then(async (res) => {
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?(.+?)"?$/);
+      const filename = match ? match[1] : `export-${analysisId.slice(0, 8)}.docx`;
+      return { blob, filename };
+    });
+  },
 };
 
 // ===== Playbooks =====
