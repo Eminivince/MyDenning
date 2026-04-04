@@ -12,6 +12,7 @@ from app.models.legal_features import (
     ConflictParty, ConflictMatterParty, ConflictCheck,
     MonitoredRegulation, RegulatoryAlert,
     CitationValidation,
+    Feedback,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "ConflictParty", "ConflictMatterParty", "ConflictCheck",
     "MonitoredRegulation", "RegulatoryAlert",
     "CitationValidation",
+    "Feedback",
 ]

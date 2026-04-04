@@ -122,6 +122,12 @@ export const legalFeatures = {
   regulatoryAlerts: (params?: Record<string, any>) => api.get<T.RegulatoryAlert[]>("/regulatory/alerts", params),
   validateCitation: (data: { citation: string; jurisdiction?: string }) => api.post<any>("/citations/validate", data),
   validateBatch: (data: { citations: string[]; jurisdiction?: string }) => api.post<any>("/citations/validate/batch", data),
+  submitFeedback: (data: {
+    resource_type: string; resource_id: string; rating: "positive" | "negative";
+    comment?: string; correction?: string; correction_type?: string;
+    query?: string; analysis_id?: string; conversation_message_id?: string;
+  }) => api.post<any>("/feedback", data),
+  feedbackStats: (resource_type?: string) => api.get<any>("/feedback/stats", resource_type ? { resource_type } : undefined),
 };
 
 // ===== Audit =====

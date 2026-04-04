@@ -226,3 +226,38 @@ class CitationValidation(Base, UUIDMixin, TimestampMixin):
     analysis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("analysis_results.id", ondelete="SET NULL"))
 
     raw_result: Mapped[dict | None] = mapped_column(JSONB)
+
+
+# --- Feedback ---
+
+class FeedbackRating(str, enum.Enum):
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+
+
+class Feedback(Base, UUIDMixin, TimestampMixin):
+    """User feedback on AI-generated outputs — drives continuous improvement."""
+    __tablename__ = "feedback"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+
+    # What was rated
+    analysis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("analysis_results.id", ondelete="CASCADE"), index=True)
+    conversation_message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("conversation_messages.id", ondelete="CASCADE"), index=True)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # analysis, draft, review, redline, conversation
+    resource_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+
+    # Rating
+    rating: Mapped[FeedbackRating] = mapped_column(Enum(FeedbackRating), nullable=False)
+    comment: Mapped[str | None] = mapped_column(Text)  # optional explanation
+
+    # What the user corrected (if negative)
+    correction: Mapped[str | None] = mapped_column(Text)  # the corrected answer/text
+    correction_type: Mapped[str | None] = mapped_column(String(50))  # wrong_answer, wrong_citation, wrong_risk, missing_info, other
+
+    # Context for learning
+    query: Mapped[str | None] = mapped_column(Text)  # the original question/instruction
+    jurisdiction: Mapped[str | None] = mapped_column(String(100))
+    clause_type: Mapped[str | None] = mapped_column(String(100))  # for deviation false positives
+    metadata: Mapped[dict | None] = mapped_column(JSONB)

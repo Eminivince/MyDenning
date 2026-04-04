@@ -112,6 +112,20 @@ class BatchCitationValidateRequest(BaseModel):
     jurisdiction: str | None = None
 
 
+class FeedbackRequest(BaseModel):
+    resource_type: str  # analysis, draft, review, redline, conversation
+    resource_id: str
+    rating: str  # positive, negative
+    comment: str | None = None
+    correction: str | None = None
+    correction_type: str | None = None  # wrong_answer, wrong_citation, wrong_risk, missing_info, other
+    query: str | None = None
+    jurisdiction: str | None = None
+    clause_type: str | None = None
+    analysis_id: str | None = None
+    conversation_message_id: str | None = None
+
+
 # ===================== REDLINE =====================
 
 @router.post("/redline/compare")
@@ -536,3 +550,58 @@ async def validate_analysis_citations(
     from app.services.legal_features.citation_validator import CitationValidatorService
     service = CitationValidatorService(db)
     return await service.validate_analysis_citations(analysis_id, org.id, user.id)
+
+
+# ===================== FEEDBACK =====================
+
+@router.post("/feedback", status_code=status.HTTP_201_CREATED)
+async def submit_feedback(
+    request: FeedbackRequest,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Submit feedback (thumbs up/down) on any AI-generated output.
+
+    Optionally include a correction for negative feedback — this helps
+    the system learn your organization's preferences over time.
+    """
+    from app.services.legal_features.feedback import FeedbackService
+    from app.models.legal_features import FeedbackRating
+
+    service = FeedbackService(db)
+    fb = await service.submit(
+        organization_id=org.id,
+        user_id=user.id,
+        resource_type=request.resource_type,
+        resource_id=request.resource_id,
+        rating=FeedbackRating(request.rating),
+        comment=request.comment,
+        correction=request.correction,
+        correction_type=request.correction_type,
+        query=request.query,
+        jurisdiction=request.jurisdiction,
+        clause_type=request.clause_type,
+        analysis_id=uuid.UUID(request.analysis_id) if request.analysis_id else None,
+        conversation_message_id=uuid.UUID(request.conversation_message_id) if request.conversation_message_id else None,
+    )
+
+    return {
+        "id": str(fb.id),
+        "rating": fb.rating.value,
+        "resource_type": fb.resource_type,
+        "resource_id": fb.resource_id,
+    }
+
+
+@router.get("/feedback/stats")
+async def get_feedback_stats(
+    resource_type: str | None = None,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Get aggregate feedback statistics for the organization."""
+    from app.services.legal_features.feedback import FeedbackService
+    service = FeedbackService(db)
+    return await service.get_stats(org.id, resource_type)

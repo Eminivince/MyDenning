@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { conversations, analysis } from "@/lib/api/endpoints";
+import { conversations, analysis, legalFeatures } from "@/lib/api/endpoints";
 import {
   Send, Loader2, AlertTriangle, BookOpen, ChevronDown,
   ChevronRight, Plus, MessageSquare, Scale, User,
+  ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/cn";
@@ -161,24 +162,75 @@ function AssistantMessage({ content }: { content: string }) {
   );
 }
 
-function MessageBubble({ role, content }: { role: string; content: string }) {
+function MessageBubble({ id, role, content }: { id: string; role: string; content: string }) {
   const isUser = role === "user";
+  const [feedbackGiven, setFeedbackGiven] = useState<"positive" | "negative" | null>(null);
+
+  async function handleFeedback(rating: "positive" | "negative") {
+    try {
+      await legalFeatures.submitFeedback({
+        resource_type: "conversation",
+        resource_id: id,
+        rating,
+        conversation_message_id: id,
+      });
+      setFeedbackGiven(rating);
+    } catch {
+      // silent fail for feedback
+    }
+  }
+
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
+    <div className={cn("group flex gap-3", isUser && "flex-row-reverse")}>
       <div className={cn(
         "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
         isUser ? "bg-primary text-primary-foreground" : "bg-secondary"
       )}>
         {isUser ? <User className="h-3.5 w-3.5" /> : <Scale className="h-3.5 w-3.5" />}
       </div>
-      <div className={cn(
-        "max-w-[85%] rounded-lg px-4 py-3",
-        isUser ? "bg-primary text-primary-foreground" : "bg-card border"
-      )}>
-        {isUser ? (
-          <p className="text-sm whitespace-pre-wrap">{content}</p>
-        ) : (
-          <AssistantMessage content={content} />
+      <div className="max-w-[85%]">
+        <div className={cn(
+          "rounded-lg px-4 py-3",
+          isUser ? "bg-primary text-primary-foreground" : "bg-card border"
+        )}>
+          {isUser ? (
+            <p className="text-sm whitespace-pre-wrap">{content}</p>
+          ) : (
+            <AssistantMessage content={content} />
+          )}
+        </div>
+        {/* Feedback buttons — only on assistant messages */}
+        {!isUser && (
+          <div className={cn(
+            "mt-1 flex items-center gap-1 transition-opacity",
+            feedbackGiven ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}>
+            <button
+              onClick={() => handleFeedback("positive")}
+              disabled={feedbackGiven !== null}
+              className={cn(
+                "rounded p-1 text-muted-foreground transition-colors hover:text-foreground",
+                feedbackGiven === "positive" && "text-emerald-500 hover:text-emerald-500"
+              )}
+              title="Helpful"
+            >
+              <ThumbsUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => handleFeedback("negative")}
+              disabled={feedbackGiven !== null}
+              className={cn(
+                "rounded p-1 text-muted-foreground transition-colors hover:text-foreground",
+                feedbackGiven === "negative" && "text-red-500 hover:text-red-500"
+              )}
+              title="Not helpful"
+            >
+              <ThumbsDown className="h-3.5 w-3.5" />
+            </button>
+            {feedbackGiven && (
+              <span className="ml-1 text-[10px] text-muted-foreground">Thanks for the feedback</span>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -380,7 +432,7 @@ export default function AskPage() {
             // Message thread
             <div className="mx-auto max-w-3xl space-y-4">
               {messages?.map((msg) => (
-                <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
+                <MessageBubble key={msg.id} id={msg.id} role={msg.role} content={msg.content} />
               ))}
               {sending && (
                 <div className="flex gap-3">
