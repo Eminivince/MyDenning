@@ -63,7 +63,40 @@ async def create_client(request: ClientCreate, user: CurrentUser = None, org: Cu
     )
     db.add(client)
     await db.flush()
-    return _client_dict(client)
+
+    # Auto-run conflict check on the new client name
+    conflict_warning = None
+    try:
+        from app.services.legal_features.conflicts import ConflictCheckingService
+        conflict_service = ConflictCheckingService(db)
+
+        # Register as a conflict party for future checks
+        await conflict_service.register_party(
+            organization_id=org.id,
+            name=request.name,
+            party_type=request.client_type,
+            jurisdiction=request.jurisdiction,
+        )
+
+        # Run conflict check
+        check = await conflict_service.check_conflicts(
+            organization_id=org.id,
+            user_id=user.id,
+            party_names=[request.name],
+        )
+        if check.conflicts_found:
+            conflict_warning = {
+                "status": check.status.value,
+                "conflicts": check.conflicts_found,
+                "check_id": str(check.id),
+            }
+    except Exception:
+        pass  # conflict check failure should not block client creation
+
+    result = _client_dict(client)
+    if conflict_warning:
+        result["conflict_warning"] = conflict_warning
+    return result
 
 
 @router.get("")

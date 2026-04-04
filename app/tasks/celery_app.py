@@ -43,6 +43,10 @@ celery_app.conf.update(
             "task": "app.tasks.monitoring_tasks.process_scheduled_digests",
             "schedule": 3600.0,  # every hour
         },
+        "send-calendar-reminders": {
+            "task": "app.tasks.monitoring_tasks.send_calendar_reminders",
+            "schedule": 900.0,  # every 15 min
+        },
     },
 )
 

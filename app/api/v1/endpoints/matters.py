@@ -61,6 +61,9 @@ async def _check_matter_access(
         ))
     )
     if admin_result.scalar_one_or_none():
+        # Even admins need explicit membership for highly_confidential matters
+        if matter.confidentiality_level == ConfidentialityLevel.HIGHLY_CONFIDENTIAL:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Highly confidential — explicit matter membership required")
         return matter
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this matter")
@@ -122,6 +125,14 @@ async def list_matters(
     if not is_admin:
         member_ids = select(MatterMembership.matter_id).where(MatterMembership.user_id == user.id)
         conditions.append(or_(Matter.id.in_(member_ids), Matter.created_by_id == user.id, Matter.lead_lawyer_id == user.id))
+    else:
+        # Even admins can't list highly_confidential matters unless they're explicit members
+        hc_member_ids = select(MatterMembership.matter_id).where(MatterMembership.user_id == user.id)
+        conditions.append(or_(
+            Matter.confidentiality_level != ConfidentialityLevel.HIGHLY_CONFIDENTIAL,
+            Matter.id.in_(hc_member_ids),
+            Matter.created_by_id == user.id,
+        ))
 
     if status_filter: conditions.append(Matter.status == status_filter)
     if matter_type: conditions.append(Matter.matter_type == matter_type)

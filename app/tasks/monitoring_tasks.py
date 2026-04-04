@@ -147,3 +147,65 @@ def process_scheduled_digests():
             logger.info("task_digests_completed", digests_sent=count)
 
     _run_async(_process())
+
+
+@celery_app.task
+def send_calendar_reminders():
+    """Check for upcoming calendar events and fire reminder webhooks. Runs every 15 min."""
+    logger.info("task_calendar_reminders_started")
+
+    async def _send():
+        from sqlalchemy import select, and_
+        from app.db.session import async_session_factory
+        from app.models.matter import CalendarEvent
+
+        async with async_session_factory() as db:
+            now = datetime.now(timezone.utc)
+
+            # Find events starting in the next 60 minutes that have reminders
+            upcoming = await db.execute(
+                select(CalendarEvent).where(
+                    and_(
+                        CalendarEvent.start_time > now,
+                        CalendarEvent.start_time <= now + timedelta(hours=1),
+                        CalendarEvent.reminders.isnot(None),
+                    )
+                )
+            )
+            events = upcoming.scalars().all()
+
+            fired = 0
+            for event in events:
+                if not event.reminders:
+                    continue
+
+                for reminder in event.reminders:
+                    minutes_before = reminder.get("minutes_before", 30)
+                    reminder_time = event.start_time - timedelta(minutes=minutes_before)
+
+                    # Fire if reminder time is within the last 15 minutes (our check interval)
+                    if now - timedelta(minutes=15) <= reminder_time <= now:
+                        try:
+                            from app.services.legal_features.webhooks import WebhookService
+                            wh_service = WebhookService(db)
+                            await wh_service.fire_event(
+                                organization_id=event.organization_id,
+                                event_type="deadline.approaching",
+                                payload={
+                                    "event_id": str(event.id),
+                                    "title": event.title,
+                                    "event_type": event.event_type.value,
+                                    "start_time": event.start_time.isoformat(),
+                                    "location": event.location,
+                                    "matter_id": str(event.matter_id) if event.matter_id else None,
+                                    "minutes_until": int((event.start_time - now).total_seconds() / 60),
+                                },
+                            )
+                            fired += 1
+                        except Exception as e:
+                            logger.warning("calendar_reminder_failed", event_id=str(event.id), error=str(e))
+
+            await db.commit()
+            logger.info("task_calendar_reminders_completed", events_checked=len(events), reminders_fired=fired)
+
+    _run_async(_send())

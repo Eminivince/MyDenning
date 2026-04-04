@@ -127,6 +127,7 @@ class InvoiceCreate(BaseModel):
     matter_id: uuid.UUID | None = None
     due_date: datetime
     currency: str = "NGN"
+    tax_rate: float = 0.0  # percentage, e.g. 7.5 for Nigeria VAT
     notes: str | None = None
     payment_terms: str | None = None
     time_entry_ids: list[uuid.UUID] | None = None  # specific entries to include
@@ -172,7 +173,9 @@ async def create_invoice(request: InvoiceCreate, user: CurrentUser = None, org: 
         issue_date=datetime.now(timezone.utc),
         due_date=request.due_date,
         subtotal=round(subtotal, 2),
-        total=round(subtotal, 2),  # tax can be added separately
+        tax_rate=request.tax_rate,
+        tax_amount=round(subtotal * request.tax_rate / 100, 2),
+        total=round(subtotal + (subtotal * request.tax_rate / 100), 2),
         currency=request.currency,
         line_items=line_items,
         notes=request.notes,
