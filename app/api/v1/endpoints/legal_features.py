@@ -113,6 +113,15 @@ class BatchCitationValidateRequest(BaseModel):
     jurisdiction: str | None = None
 
 
+class NegotiationRequest(BaseModel):
+    document_id: uuid.UUID
+    playbook_id: uuid.UUID
+    counterparty_name: str | None = None
+    matter_id: uuid.UUID | None = None
+    priorities: list[str] | None = None  # e.g. ["limit liability", "retain IP rights", "short term"]
+    deal_context: str | None = None  # e.g. "Key vendor, we need this deal but can't accept uncapped liability"
+
+
 class WebhookCreateRequest(BaseModel):
     name: str
     url: str
@@ -392,6 +401,48 @@ async def approve_conflict_clearance(
     service = ConflictCheckingService(db)
     check = await service.approve_conflict_clearance(check_id, user.id)
     return {"id": str(check.id), "approved": True, "approved_at": check.approved_at.isoformat()}
+
+
+# ===================== NEGOTIATION =====================
+
+@router.post("/negotiation/strategy")
+async def generate_negotiation_strategy(
+    request: NegotiationRequest,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Generate a smart negotiation strategy for a counterparty's contract.
+
+    Analyzes the counterparty's positions against your playbook, looks up
+    prior dealings with this counterparty, predicts pushback areas, and
+    produces a complete strategy memo with exact counter-language and
+    ordered fallback positions for each clause.
+    """
+    from app.services.legal_features.negotiation import NegotiationAssistant
+    service = NegotiationAssistant(db)
+    result = await service.generate_strategy(
+        document_id=request.document_id,
+        playbook_id=request.playbook_id,
+        organization_id=org.id,
+        user_id=user.id,
+        counterparty_name=request.counterparty_name,
+        matter_id=request.matter_id,
+        priorities=request.priorities,
+        deal_context=request.deal_context,
+    )
+
+    audit = AuditService(db)
+    await audit.log(
+        organization_id=org.id,
+        user_id=user.id,
+        action="negotiation_strategy",
+        resource_type="analysis",
+        resource_id=str(result["id"]),
+        description=f"Negotiation strategy: {request.counterparty_name or 'counterparty'}",
+    )
+
+    return result
 
 
 # ===================== MULTI-JURISDICTION =====================

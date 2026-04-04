@@ -118,6 +118,11 @@ export const legalFeatures = {
   registerParty: (data: any) => api.post<any>("/conflicts/parties", data),
   partyHistory: (name: string) => api.get<any[]>(`/conflicts/parties/${encodeURIComponent(name)}/history`),
   multiJurisdiction: (data: { topic: string; jurisdictions: string[] }) => api.post<any>("/multi-jurisdiction/compare", data),
+  negotiationStrategy: (data: {
+    document_id: string; playbook_id: string;
+    counterparty_name?: string; matter_id?: string;
+    priorities?: string[]; deal_context?: string;
+  }) => api.post<any>("/negotiation/strategy", data),
   regulatoryMonitors: () => api.get<any[]>("/regulatory/monitors"),
   createMonitor: (data: any) => api.post<any>("/regulatory/monitors", data),
   triggerCheck: (monitorId: string) => api.post<any>(`/regulatory/monitors/${monitorId}/check`),
