@@ -328,3 +328,45 @@ class ScheduledDigest(Base, UUIDMixin, TimestampMixin):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# --- Email Intake ---
+
+class EmailIntakeConfig(Base, UUIDMixin, TimestampMixin):
+    """Per-org configuration for email-based document ingestion."""
+    __tablename__ = "email_intake_configs"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    intake_email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)  # e.g. acme-legal@ingest.mydenning.com
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Defaults applied to ingested documents
+    default_document_type: Mapped[str] = mapped_column(String(50), default="contract")
+    default_jurisdiction: Mapped[str | None] = mapped_column(String(100))
+    default_matter_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("matters.id", ondelete="SET NULL"))
+    auto_review: Mapped[bool] = mapped_column(Boolean, default=False)  # auto-run clause extraction after processing
+    auto_playbook_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("playbooks.id", ondelete="SET NULL"))  # auto-compare against this playbook
+
+    # Allowed senders (empty = accept from anyone in the org's domain)
+    allowed_sender_domains: Mapped[list | None] = mapped_column(JSONB)
+    allowed_sender_emails: Mapped[list | None] = mapped_column(JSONB)
+
+
+class EmailIntakeLog(Base, UUIDMixin, TimestampMixin):
+    """Log of every inbound email processed."""
+    __tablename__ = "email_intake_logs"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    config_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("email_intake_configs.id", ondelete="CASCADE"), nullable=False)
+
+    sender_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject: Mapped[str | None] = mapped_column(String(1000))
+    body_preview: Mapped[str | None] = mapped_column(Text)
+    attachment_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Results
+    documents_created: Mapped[list | None] = mapped_column(JSONB)  # [{document_id, title, file_name}]
+    status: Mapped[str] = mapped_column(String(50), default="processed")  # processed, rejected, failed
+    rejection_reason: Mapped[str | None] = mapped_column(String(500))

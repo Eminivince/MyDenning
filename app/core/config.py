@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     canlii_api_key: str = ""  # Free: register at developer.canlii.org
     indian_kanoon_api_key: str = ""  # Apply at indiankanoon.org/api
 
+    # Email intake (inbound email parsing — SendGrid, Mailgun, or Postmark)
+    email_intake_enabled: bool = False
+    email_intake_provider: str = "sendgrid"  # sendgrid, mailgun, postmark
+    email_intake_webhook_secret: str = ""  # verify inbound webhook authenticity
+    email_intake_domain: str = ""  # e.g. "ingest.mydenning.com"
+
 
 @lru_cache
 def get_settings() -> Settings:

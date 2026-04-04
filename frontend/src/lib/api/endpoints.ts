@@ -132,6 +132,12 @@ export const legalFeatures = {
   feedbackStats: (resource_type?: string) => api.get<any>("/feedback/stats", resource_type ? { resource_type } : undefined),
 };
 
+// ===== Email Intake =====
+export const emailIntake = {
+  getConfig: () => api.get<any>("/intake/email/config"),
+  configure: (data: any) => api.post<any>("/intake/email/configure", data),
+};
+
 // ===== Audit =====
 export const audit = {
   logs: (params?: Record<string, any>) => api.get<any>("/audit/logs", params),

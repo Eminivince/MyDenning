@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { memory, legalSources } from "@/lib/api/endpoints";
+import { memory, legalSources, emailIntake } from "@/lib/api/endpoints";
 import { useTheme } from "next-themes";
-import { Save, Loader2, Sun, Moon, Monitor, Globe, Download, CheckCircle2 } from "lucide-react";
+import { Save, Loader2, Sun, Moon, Monitor, Globe, Download, CheckCircle2, Mail, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
@@ -75,6 +75,66 @@ function StarterPacksSection() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmailIntakeSection() {
+  const queryClient = useQueryClient();
+  const { data: config, isLoading } = useQuery({ queryKey: ["email-intake-config"], queryFn: () => emailIntake.getConfig() });
+  const [copied, setCopied] = useState(false);
+
+  const setupMutation = useMutation({
+    mutationFn: () => emailIntake.configure({ default_document_type: "contract" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["email-intake-config"] }); toast.success("Email intake configured"); },
+    onError: (err: any) => toast.error(err.detail || "Setup failed"),
+  });
+
+  function handleCopy(text: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Email Intake</CardTitle>
+        <CardDescription>Forward emails with document attachments to auto-ingest into MyDenning</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        ) : config?.configured ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 rounded-md border bg-secondary/30 p-3">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <code className="flex-1 text-sm font-mono">{config.intake_email}</code>
+              <Button variant="ghost" size="sm" onClick={() => handleCopy(config.intake_email)}>
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Forward any email with PDF, DOCX, or TXT attachments to this address. Documents will be
+              automatically uploaded and processed.
+            </p>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span>Type: {config.default_document_type}</span>
+              {config.default_jurisdiction && <span>Jurisdiction: {config.default_jurisdiction}</span>}
+              <span>Auto-review: {config.auto_review ? "On" : "Off"}</span>
+              <Badge variant={config.is_active ? "success" : "secondary"} className="text-[10px]">{config.is_active ? "Active" : "Inactive"}</Badge>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-sm text-muted-foreground mb-3">Not configured yet. Set up email intake to auto-ingest documents from your inbox.</p>
+            <Button onClick={() => setupMutation.mutate()} disabled={setupMutation.isPending}>
+              {setupMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+              Set Up Email Intake
+            </Button>
           </div>
         )}
       </CardContent>
@@ -176,6 +236,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Email Intake */}
+      <EmailIntakeSection />
 
       {/* Starter Packs */}
       <StarterPacksSection />
