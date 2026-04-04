@@ -7,16 +7,21 @@ import { useAuthStore } from "@/lib/store/auth";
 import { Sun, Moon, LogOut, User } from "lucide-react";
 
 const PAGE_TITLES: Record<string, string> = {
+  "/clients": "Clients",
+  "/matters": "Matters",
+  "/documents": "Documents",
+  "/tasks": "Tasks",
+  "/calendar": "Calendar",
+  "/billing": "Billing",
   "/ask": "Ask",
   "/research": "Research",
-  "/documents": "Documents",
-  "/matters": "Matters",
-  "/playbooks": "Playbooks",
-  "/draft": "Draft",
   "/compare": "Compare",
+  "/draft": "Draft",
+  "/playbooks": "Playbooks",
   "/monitor": "Monitor",
   "/conflicts": "Conflicts",
-  "/clients": "Client Portal",
+  "/portal-clients": "Client Portal",
+  "/team": "Team",
   "/audit": "Audit Trail",
   "/settings": "Settings",
 };

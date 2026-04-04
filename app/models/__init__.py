@@ -1,7 +1,10 @@
-from app.models.user import User, Organization, OrganizationMember
+from app.models.user import User, Organization, OrganizationMember, Team, Client
 from app.models.document import Document, DocumentVersion, DocumentChunk
 from app.models.legal_source import LegalSource, LegalCitation, CitationRelationship
-from app.models.matter import Matter, MatterDocument, MatterNote, MatterDeadline
+from app.models.matter import (
+    Matter, MatterMembership, MatterDocument, MatterNote, MatterDeadline,
+    Task, TimeEntry, Invoice, CalendarEvent,
+)
 from app.models.playbook import Playbook, PlaybookClause
 from app.models.analysis import AnalysisResult, ClauseExtraction, DeviationReport
 from app.models.audit import AuditLog
@@ -19,10 +22,11 @@ from app.models.legal_features import (
 )
 
 __all__ = [
-    "User", "Organization", "OrganizationMember",
+    "User", "Organization", "OrganizationMember", "Team", "Client",
     "Document", "DocumentVersion", "DocumentChunk",
     "LegalSource", "LegalCitation", "CitationRelationship",
-    "Matter", "MatterDocument", "MatterNote", "MatterDeadline",
+    "Matter", "MatterMembership", "MatterDocument", "MatterNote", "MatterDeadline",
+    "Task", "TimeEntry", "Invoice", "CalendarEvent",
     "Playbook", "PlaybookClause",
     "AnalysisResult", "ClauseExtraction", "DeviationReport",
     "AuditLog",

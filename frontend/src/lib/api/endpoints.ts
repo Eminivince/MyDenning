@@ -149,6 +149,51 @@ export const clientPortal = {
   revokeAccess: (clientId: string, matterId: string) => api.delete(`/portal/access/${clientId}/${matterId}`),
 };
 
+// ===== Firm Clients =====
+export const clients = {
+  list: (params?: Record<string, any>) => api.get<any>("/clients", params),
+  get: (id: string) => api.get<any>(`/clients/${id}`),
+  create: (data: any) => api.post<any>("/clients", data),
+  update: (id: string, data: any) => api.patch<any>(`/clients/${id}`, data),
+};
+
+// ===== Tasks =====
+export const tasks = {
+  list: (params?: Record<string, any>) => api.get<any[]>("/tasks", params),
+  create: (data: any) => api.post<any>("/tasks", data),
+  update: (id: string, data: any) => api.patch<any>(`/tasks/${id}`, data),
+  approve: (id: string) => api.post<any>(`/tasks/${id}/approve`),
+};
+
+// ===== Billing =====
+export const billing = {
+  timeEntries: (params?: Record<string, any>) => api.get<any>("/billing/time-entries", params),
+  logTime: (data: any) => api.post<any>("/billing/time-entries", data),
+  updateEntry: (id: string, data: any) => api.patch<any>(`/billing/time-entries/${id}`, data),
+  invoices: (params?: Record<string, any>) => api.get<any[]>("/billing/invoices", params),
+  createInvoice: (data: any) => api.post<any>("/billing/invoices", data),
+  getInvoice: (id: string) => api.get<any>(`/billing/invoices/${id}`),
+  updateInvoiceStatus: (id: string, status: string, amount_paid?: number) =>
+    api.patch<any>(`/billing/invoices/${id}/status`, undefined),
+  summary: () => api.get<any>("/billing/summary"),
+};
+
+// ===== Calendar =====
+export const calendar = {
+  list: (params?: Record<string, any>) => api.get<any[]>("/calendar", params),
+  create: (data: any) => api.post<any>("/calendar", data),
+  get: (id: string) => api.get<any>(`/calendar/${id}`),
+  update: (id: string, data: any) => api.patch<any>(`/calendar/${id}`, data),
+  delete: (id: string) => api.delete(`/calendar/${id}`),
+};
+
+// ===== Teams =====
+export const teams = {
+  list: () => api.get<any[]>("/teams"),
+  create: (data: any) => api.post<any>("/teams", data),
+  update: (id: string, data: any) => api.patch<any>(`/teams/${id}`, data),
+};
+
 // ===== Email Intake =====
 export const emailIntake = {
   getConfig: () => api.get<any>("/intake/email/config"),

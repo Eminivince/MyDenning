@@ -6,27 +6,40 @@ import { cn } from "@/lib/utils/cn";
 import {
   Scale, MessageSquare, Search, FileText, Briefcase, BookOpen,
   PenTool, GitCompare, Bell, Shield, ClipboardList, Settings,
-  ChevronLeft, ChevronRight, Users,
+  ChevronLeft, ChevronRight, Users, CheckSquare, Clock,
+  Receipt, Calendar, Building2, UsersRound,
 } from "lucide-react";
 import { useState } from "react";
 
 const navigation = [
-  { name: "Ask", href: "/ask", icon: MessageSquare, description: "Legal Q&A" },
-  { name: "Research", href: "/research", icon: Search, description: "Search authorities" },
-  { name: "Documents", href: "/documents", icon: FileText, description: "Manage documents" },
-  { name: "Matters", href: "/matters", icon: Briefcase, description: "Track matters" },
-  { name: "Playbooks", href: "/playbooks", icon: BookOpen, description: "Contract playbooks" },
-  { name: "Draft", href: "/draft", icon: PenTool, description: "Generate work products" },
-  { name: "Compare", href: "/compare", icon: GitCompare, description: "Redline & compare" },
-  { name: "Monitor", href: "/monitor", icon: Bell, description: "Regulatory alerts" },
-  { name: "Conflicts", href: "/conflicts", icon: Shield, description: "Conflict checks" },
-  { name: "Clients", href: "/clients", icon: Users, description: "Client portal" },
-  { name: "Audit", href: "/audit", icon: ClipboardList, description: "Audit trail" },
+  // Practice management — the core
+  { name: "Clients", href: "/clients", icon: Building2, group: "Practice" },
+  { name: "Matters", href: "/matters", icon: Briefcase, group: "Practice" },
+  { name: "Documents", href: "/documents", icon: FileText, group: "Practice" },
+  { name: "Tasks", href: "/tasks", icon: CheckSquare, group: "Practice" },
+  { name: "Calendar", href: "/calendar", icon: Calendar, group: "Practice" },
+  { name: "Billing", href: "/billing", icon: Receipt, group: "Practice" },
+
+  // AI intelligence — woven through everything
+  { name: "Ask", href: "/ask", icon: MessageSquare, group: "Intelligence" },
+  { name: "Research", href: "/research", icon: Search, group: "Intelligence" },
+  { name: "Compare", href: "/compare", icon: GitCompare, group: "Intelligence" },
+  { name: "Draft", href: "/draft", icon: PenTool, group: "Intelligence" },
+  { name: "Playbooks", href: "/playbooks", icon: BookOpen, group: "Intelligence" },
+
+  // Firm operations
+  { name: "Monitor", href: "/monitor", icon: Bell, group: "Operations" },
+  { name: "Conflicts", href: "/conflicts", icon: Shield, group: "Operations" },
+  { name: "Portal", href: "/portal-clients", icon: Users, group: "Operations" },
+  { name: "Team", href: "/team", icon: UsersRound, group: "Operations" },
+  { name: "Audit", href: "/audit", icon: ClipboardList, group: "Operations" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+
+  let lastGroup = "";
 
   return (
     <aside
@@ -44,24 +57,33 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2">
+      <nav className="flex-1 overflow-y-auto p-2">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+          const showGroup = !collapsed && item.group !== lastGroup;
+          lastGroup = item.group;
+
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.name : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+            <div key={item.href}>
+              {showGroup && (
+                <p className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {item.group}
+                </p>
               )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>{item.name}</span>}
-            </Link>
+              <Link
+                href={item.href}
+                title={collapsed ? item.name : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                )}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>{item.name}</span>}
+              </Link>
+            </div>
           );
         })}
       </nav>
@@ -71,7 +93,7 @@ export function Sidebar() {
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground",
+            "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground",
             pathname === "/settings" && "bg-secondary text-foreground"
           )}
         >
@@ -80,7 +102,7 @@ export function Sidebar() {
         </Link>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/50"
+          className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/50"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           {!collapsed && <span>Collapse</span>}
