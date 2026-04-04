@@ -370,3 +370,35 @@ class EmailIntakeLog(Base, UUIDMixin, TimestampMixin):
     documents_created: Mapped[list | None] = mapped_column(JSONB)  # [{document_id, title, file_name}]
     status: Mapped[str] = mapped_column(String(50), default="processed")  # processed, rejected, failed
     rejection_reason: Mapped[str | None] = mapped_column(String(500))
+
+
+# --- Client Portal ---
+
+class ClientUser(Base, UUIDMixin, TimestampMixin):
+    """External client users who access the read-only portal."""
+    __tablename__ = "client_users"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    invited_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    company_name: Mapped[str | None] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ClientMatterAccess(Base, UUIDMixin, TimestampMixin):
+    """Controls which matters a client user can see."""
+    __tablename__ = "client_matter_access"
+
+    client_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("client_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    matter_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Granular visibility controls
+    can_view_documents: Mapped[bool] = mapped_column(Boolean, default=True)
+    can_view_deadlines: Mapped[bool] = mapped_column(Boolean, default=True)
+    can_view_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    can_view_notes: Mapped[bool] = mapped_column(Boolean, default=False)  # internal notes hidden by default
+    can_upload_documents: Mapped[bool] = mapped_column(Boolean, default=True)  # clients can upload docs for review

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import {
   Scale, MessageSquare, Search, FileText, Briefcase, BookOpen,
   PenTool, GitCompare, Bell, Shield, ClipboardList, Settings,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Users,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -20,6 +20,7 @@ const navigation = [
   { name: "Compare", href: "/compare", icon: GitCompare, description: "Redline & compare" },
   { name: "Monitor", href: "/monitor", icon: Bell, description: "Regulatory alerts" },
   { name: "Conflicts", href: "/conflicts", icon: Shield, description: "Conflict checks" },
+  { name: "Clients", href: "/clients", icon: Users, description: "Client portal" },
   { name: "Audit", href: "/audit", icon: ClipboardList, description: "Audit trail" },
 ];
 

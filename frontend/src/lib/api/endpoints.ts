@@ -137,6 +137,15 @@ export const legalFeatures = {
   feedbackStats: (resource_type?: string) => api.get<any>("/feedback/stats", resource_type ? { resource_type } : undefined),
 };
 
+// ===== Client Portal (internal management) =====
+export const clientPortal = {
+  inviteClient: (data: { email: string; full_name: string; password: string; company_name?: string; matter_ids?: string[] }) =>
+    api.post<any>("/portal/clients", data),
+  listClients: () => api.get<any[]>("/portal/clients"),
+  grantAccess: (data: any) => api.post<any>("/portal/access", data),
+  revokeAccess: (clientId: string, matterId: string) => api.delete(`/portal/access/${clientId}/${matterId}`),
+};
+
 // ===== Email Intake =====
 export const emailIntake = {
   getConfig: () => api.get<any>("/intake/email/config"),

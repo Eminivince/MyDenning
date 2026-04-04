@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
-    analysis, audit, auth, conversations, documents, email_intake,
-    legal_features, legal_sources, matters, memory, playbooks,
+    analysis, audit, auth, client_portal, conversations, documents,
+    email_intake, legal_features, legal_sources, matters, memory, playbooks,
 )
 
 api_router = APIRouter()
@@ -18,3 +18,4 @@ api_router.include_router(audit.router)
 api_router.include_router(legal_sources.router)
 api_router.include_router(legal_features.router)
 api_router.include_router(email_intake.router)
+api_router.include_router(client_portal.router)

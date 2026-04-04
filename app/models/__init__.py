@@ -15,6 +15,7 @@ from app.models.legal_features import (
     Feedback,
     Webhook, WebhookDelivery, ScheduledDigest,
     EmailIntakeConfig, EmailIntakeLog,
+    ClientUser, ClientMatterAccess,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "Feedback",
     "Webhook", "WebhookDelivery", "ScheduledDigest",
     "EmailIntakeConfig", "EmailIntakeLog",
+    "ClientUser", "ClientMatterAccess",
 ]
