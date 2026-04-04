@@ -119,6 +119,22 @@ class DigestService:
             try:
                 payload = await self.generate_digest(digest.id)
 
+                # Send digest email to all org members
+                try:
+                    from app.services.integrations.email import EmailService, EmailTemplates
+                    from app.models.user import OrganizationMember, User
+                    email_svc = EmailService()
+                    html = EmailTemplates.digest(digest.name, payload.get("sections", {}))
+                    members = await self.db.execute(
+                        select(User).join(OrganizationMember, OrganizationMember.user_id == User.id)
+                        .where(OrganizationMember.organization_id == digest.organization_id)
+                    )
+                    emails = [m.email for m in members.scalars().all() if m.email]
+                    if emails:
+                        await email_svc.send(to=emails, subject=f"MyDenning Digest: {digest.name}", html_body=html)
+                except Exception as email_err:
+                    logger.warning("digest_email_failed", error=str(email_err))
+
                 # Deliver via webhook if configured
                 if digest.webhook_id:
                     from app.services.legal_features.webhooks import WebhookService

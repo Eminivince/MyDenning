@@ -76,6 +76,33 @@ class Settings(BaseSettings):
     email_intake_webhook_secret: str = ""  # verify inbound webhook authenticity
     email_intake_domain: str = ""  # e.g. "ingest.mydenning.com"
 
+    # Outbound email (for notifications, digests, client comms)
+    email_provider: str = "smtp"  # smtp, sendgrid, postmark
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    sendgrid_api_key: str = ""  # if email_provider=sendgrid
+    postmark_server_token: str = ""  # if email_provider=postmark
+    email_from_address: str = "noreply@mydenning.com"
+    email_from_name: str = "MyDenning"
+
+    # Payments (Stripe or Paystack)
+    payment_provider: str = ""  # stripe, paystack, or empty to disable
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    paystack_secret_key: str = ""
+    paystack_webhook_secret: str = ""
+
+    # Google Calendar
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
+    # Cloud Storage (Google Drive / OneDrive)
+    gdrive_client_id: str = ""
+    gdrive_client_secret: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
