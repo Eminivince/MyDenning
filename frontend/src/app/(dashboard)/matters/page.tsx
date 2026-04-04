@@ -23,7 +23,11 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "success" | "warni
 function CreateMatterDialog() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", matter_type: "advisory" as MatterType, description: "", jurisdiction: "", counterparty: "", client_name: "" });
+  const [form, setForm] = useState({
+    title: "", matter_type: "advisory" as MatterType, description: "",
+    jurisdiction: "", counterparty: "", client_name: "",
+    practice_area: "", priority: 3, confidentiality_level: "confidential",
+  });
   const update = (f: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((p) => ({ ...p, [f]: e.target.value }));
 
   const mutation = useMutation({
@@ -35,24 +39,47 @@ function CreateMatterDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />New Matter</Button></DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Create Matter</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <Input value={form.title} onChange={update("title")} placeholder="Matter title" />
-          <Select value={form.matter_type} onValueChange={(v) => setForm((p) => ({ ...p, matter_type: v as MatterType }))}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {["litigation","transaction","advisory","regulatory","corporate","employment","ip","real_estate","other"].map((t) => (
-                <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Select value={form.matter_type} onValueChange={(v) => setForm((p) => ({ ...p, matter_type: v as MatterType }))}>
+              <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+              <SelectContent>
+                {["litigation","transaction","advisory","regulatory","corporate","employment","ip","real_estate","other"].map((t) => (
+                  <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input value={form.practice_area} onChange={update("practice_area")} placeholder="Practice area (e.g. corporate, IP)" />
+          </div>
           <Textarea value={form.description} onChange={update("description")} placeholder="Description (optional)" />
           <div className="grid grid-cols-2 gap-3">
             <Input value={form.client_name} onChange={update("client_name")} placeholder="Client name" />
             <Input value={form.counterparty} onChange={update("counterparty")} placeholder="Counterparty" />
           </div>
-          <Input value={form.jurisdiction} onChange={update("jurisdiction")} placeholder="Jurisdiction (e.g. NG, GB, US)" />
+          <div className="grid grid-cols-2 gap-3">
+            <Input value={form.jurisdiction} onChange={update("jurisdiction")} placeholder="Jurisdiction (e.g. NG, GB, US)" />
+            <Select value={String(form.priority)} onValueChange={(v) => setForm((p) => ({ ...p, priority: Number(v) }))}>
+              <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Critical</SelectItem>
+                <SelectItem value="2">High</SelectItem>
+                <SelectItem value="3">Medium</SelectItem>
+                <SelectItem value="4">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Select value={form.confidentiality_level} onValueChange={(v) => setForm((p) => ({ ...p, confidentiality_level: v }))}>
+            <SelectTrigger><SelectValue placeholder="Confidentiality" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="internal">Internal</SelectItem>
+              <SelectItem value="confidential">Confidential</SelectItem>
+              <SelectItem value="highly_confidential">Highly Confidential</SelectItem>
+            </SelectContent>
+          </Select>
           <Button className="w-full" disabled={!form.title || mutation.isPending} onClick={() => mutation.mutate()}>
             {mutation.isPending ? "Creating..." : "Create Matter"}
           </Button>

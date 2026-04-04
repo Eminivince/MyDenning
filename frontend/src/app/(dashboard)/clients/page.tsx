@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,7 +83,8 @@ export default function ClientsPage() {
       ) : (
         <div className="space-y-2">
           {clientList.map((client: any) => (
-            <Card key={client.id} className="transition-colors hover:bg-secondary/30">
+            <Link key={client.id} href={`/clients/${client.id}`}>
+            <Card className="transition-colors hover:bg-secondary/30">
               <CardContent className="flex items-center gap-4 p-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
                   <Building2 className="h-5 w-5 text-muted-foreground" />
@@ -106,6 +108,7 @@ export default function ClientsPage() {
                 </div>
               </CardContent>
             </Card>
+            </Link>
           ))}
         </div>
       )}

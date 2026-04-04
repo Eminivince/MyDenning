@@ -304,6 +304,103 @@ class ExportService:
         self._add_disclaimer(doc)
         return self._to_bytes(doc)
 
+    def export_invoice(self, invoice: dict, org_name: str = "", client_name: str = "") -> bytes:
+        """Export an invoice as a formatted .docx document."""
+        doc = self._create_document()
+        self._add_title(doc, "INVOICE")
+
+        # Header info
+        if org_name:
+            p = doc.add_paragraph()
+            run = p.add_run(org_name)
+            run.font.size = Pt(14)
+            run.font.bold = True
+
+        p = doc.add_paragraph()
+        p.add_run(f"Invoice #: ").font.bold = True
+        p.add_run(invoice.get("invoice_number", ""))
+        p = doc.add_paragraph()
+        p.add_run(f"Date: ").font.bold = True
+        p.add_run(invoice.get("issue_date", "")[:10])
+        p = doc.add_paragraph()
+        p.add_run(f"Due Date: ").font.bold = True
+        p.add_run(invoice.get("due_date", "")[:10])
+
+        if client_name:
+            doc.add_paragraph()
+            p = doc.add_paragraph()
+            p.add_run("Bill To: ").font.bold = True
+            p.add_run(client_name)
+
+        doc.add_paragraph()
+
+        # Line items table
+        line_items = invoice.get("line_items", [])
+        if line_items:
+            table = doc.add_table(rows=1, cols=5)
+            table.style = "Table Grid"
+            for i, text in enumerate(["Date", "Description", "Hours", "Rate", "Amount"]):
+                table.rows[0].cells[i].text = text
+                for paragraph in table.rows[0].cells[i].paragraphs:
+                    for run in paragraph.runs:
+                        run.font.bold = True
+                        run.font.size = Pt(9)
+
+            for item in line_items:
+                row = table.add_row().cells
+                row[0].text = str(item.get("date", ""))[:10]
+                row[1].text = str(item.get("description", ""))
+                row[2].text = str(item.get("hours", ""))
+                row[3].text = str(item.get("rate", ""))
+                row[4].text = f"{item.get('amount', 0):,.2f}"
+                for cell in row:
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.size = Pt(9)
+
+        # Totals
+        doc.add_paragraph()
+        currency = invoice.get("currency", "NGN")
+
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p.add_run(f"Subtotal: {currency} {invoice.get('subtotal', 0):,.2f}")
+
+        if invoice.get("tax_amount", 0) > 0:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p.add_run(f"Tax ({invoice.get('tax_rate', 0)}%): {currency} {invoice.get('tax_amount', 0):,.2f}")
+
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        run = p.add_run(f"Total: {currency} {invoice.get('total', 0):,.2f}")
+        run.font.bold = True
+        run.font.size = Pt(14)
+
+        if invoice.get("amount_paid", 0) > 0:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p.add_run(f"Paid: {currency} {invoice.get('amount_paid', 0):,.2f}")
+            balance = invoice.get("total", 0) - invoice.get("amount_paid", 0)
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            run = p.add_run(f"Balance Due: {currency} {balance:,.2f}")
+            run.font.bold = True
+
+        if invoice.get("notes"):
+            doc.add_paragraph()
+            p = doc.add_paragraph()
+            p.add_run("Notes: ").font.bold = True
+            p.add_run(invoice["notes"])
+
+        if invoice.get("payment_terms"):
+            p = doc.add_paragraph()
+            p.add_run("Payment Terms: ").font.bold = True
+            p.add_run(invoice["payment_terms"])
+
+        self._add_disclaimer(doc)
+        return self._to_bytes(doc)
+
     # ===== Internal helpers =====
 
     def _create_document(self) -> DocxDocument:

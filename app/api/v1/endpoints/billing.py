@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select, and_, func
 
@@ -299,6 +300,32 @@ def _entry_dict(e: TimeEntry) -> dict:
         "invoice_id": str(e.invoice_id) if e.invoice_id else None,
         "created_at": e.created_at.isoformat(),
     }
+
+
+@router.get("/invoices/{invoice_id}/download")
+async def download_invoice(invoice_id: uuid.UUID, org: CurrentOrg = None, db: DB = None):
+    """Download an invoice as a formatted Word document."""
+    invoice = await db.get(Invoice, invoice_id)
+    if not invoice or invoice.organization_id != org.id:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Get client name if linked
+    client_name = ""
+    if invoice.client_id:
+        from app.models.user import Client
+        client = await db.get(Client, invoice.client_id)
+        if client:
+            client_name = client.name
+
+    from app.services.output.export import ExportService
+    exporter = ExportService()
+    docx_bytes = exporter.export_invoice(_invoice_dict(invoice), org_name=org.name, client_name=client_name)
+
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="invoice-{invoice.invoice_number}.docx"'},
+    )
 
 
 def _invoice_dict(i: Invoice) -> dict:
