@@ -3,17 +3,23 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.models.matter import DeadlineStatus, MatterStatus, MatterType
+from app.models.matter import ConfidentialityLevel, DeadlineStatus, MatterAccessLevel, MatterStatus, MatterType
 
 
 class MatterCreate(BaseModel):
     title: str
     description: str | None = None
     matter_type: MatterType
+    client_id: uuid.UUID | None = None
     jurisdiction: str | None = None
     governing_law: str | None = None
     counterparty: str | None = None
     client_name: str | None = None
+    practice_area: str | None = None
+    priority: int = 3
+    lead_lawyer_id: uuid.UUID | None = None
+    team_id: uuid.UUID | None = None
+    confidentiality_level: ConfidentialityLevel = ConfidentialityLevel.CONFIDENTIAL
     tags: list[str] | None = None
 
 
@@ -22,13 +28,20 @@ class MatterOut(BaseModel):
     organization_id: uuid.UUID
     title: str
     reference_number: str | None
+    matter_code: str | None
     description: str | None
     matter_type: MatterType
     status: MatterStatus
+    client_id: uuid.UUID | None
+    practice_area: str | None
+    priority: int
     jurisdiction: str | None
     governing_law: str | None
     counterparty: str | None
     client_name: str | None
+    lead_lawyer_id: uuid.UUID | None
+    team_id: uuid.UUID | None
+    confidentiality_level: str | None
     tags: list | None
     opened_at: datetime | None
     closed_at: datetime | None
@@ -42,11 +55,33 @@ class MatterUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     status: MatterStatus | None = None
+    client_id: uuid.UUID | None = None
     jurisdiction: str | None = None
     governing_law: str | None = None
     counterparty: str | None = None
     client_name: str | None = None
+    practice_area: str | None = None
+    priority: int | None = None
+    lead_lawyer_id: uuid.UUID | None = None
+    team_id: uuid.UUID | None = None
+    confidentiality_level: ConfidentialityLevel | None = None
     tags: list[str] | None = None
+
+
+class MatterMemberAdd(BaseModel):
+    user_id: uuid.UUID
+    role_on_matter: str = "contributor"  # lead, contributor, reviewer, viewer
+    access_level: MatterAccessLevel = MatterAccessLevel.FULL
+
+
+class MatterMemberOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    role_on_matter: str
+    access_level: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class DeadlineCreate(BaseModel):
