@@ -28,6 +28,8 @@ export const matters = {
   createDeadline: (id: string, data: any) => api.post<T.Deadline>(`/matters/${id}/deadlines`, data),
   notes: (id: string) => api.get<any[]>(`/matters/${id}/notes`),
   createNote: (id: string, data: any) => api.post<any>(`/matters/${id}/notes`, data),
+  activity: (id: string, params?: Record<string, any>) => api.get<any[]>(`/matters/${id}/activity`, params),
+  stats: (id: string) => api.get<any>(`/matters/${id}/stats`),
 };
 
 // ===== Analysis =====

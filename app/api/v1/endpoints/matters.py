@@ -235,3 +235,39 @@ async def list_notes(
     )
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+# --- Activity Feed ---
+
+@router.get("/{matter_id}/activity")
+async def get_matter_activity(
+    matter_id: uuid.UUID,
+    org: CurrentOrg = None,
+    db: DB = None,
+    limit: int = Query(50, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """Get the activity feed for a matter — chronological timeline of all events."""
+    matter = await db.get(Matter, matter_id)
+    if not matter or matter.organization_id != org.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Matter not found")
+
+    from app.services.legal_features.activity_feed import ActivityFeedService
+    service = ActivityFeedService(db)
+    return await service.get_matter_feed(matter_id, org.id, limit, offset)
+
+
+@router.get("/{matter_id}/stats")
+async def get_matter_stats(
+    matter_id: uuid.UUID,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Get quick stats for a matter — document count, deadline count, analyses, etc."""
+    matter = await db.get(Matter, matter_id)
+    if not matter or matter.organization_id != org.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Matter not found")
+
+    from app.services.legal_features.activity_feed import ActivityFeedService
+    service = ActivityFeedService(db)
+    return await service.get_matter_stats(matter_id)
