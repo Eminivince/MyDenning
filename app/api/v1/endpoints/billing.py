@@ -4,11 +4,11 @@ import uuid
 from datetime import datetime, timezone
 from math import ceil
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, and_, func
 
-from app.api.deps import CurrentOrg, CurrentUser, DB
+from app.api.deps import CurrentOrg, CurrentUser, DB, require_role, BILLING_ROLES, WRITE_ROLES
 from app.models.matter import TimeEntry, Invoice, InvoiceStatus
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -132,7 +132,7 @@ class InvoiceCreate(BaseModel):
 
 
 @router.post("/invoices", status_code=status.HTTP_201_CREATED)
-async def create_invoice(request: InvoiceCreate, user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
+async def create_invoice(request: InvoiceCreate, user: CurrentUser = None, org: CurrentOrg = None, db: DB = None, _role=Depends(require_role(BILLING_ROLES))):
     # Generate invoice number
     count_result = await db.execute(select(func.count()).where(Invoice.organization_id == org.id))
     count = count_result.scalar() or 0
