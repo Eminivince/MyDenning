@@ -261,3 +261,70 @@ class Feedback(Base, UUIDMixin, TimestampMixin):
     jurisdiction: Mapped[str | None] = mapped_column(String(100))
     clause_type: Mapped[str | None] = mapped_column(String(100))  # for deviation false positives
     metadata: Mapped[dict | None] = mapped_column(JSONB)
+
+
+# --- Webhooks & Notifications ---
+
+class WebhookEventType(str, enum.Enum):
+    DOCUMENT_PROCESSED = "document.processed"
+    DOCUMENT_FAILED = "document.failed"
+    DEADLINE_APPROACHING = "deadline.approaching"
+    DEADLINE_OVERDUE = "deadline.overdue"
+    REGULATORY_ALERT = "regulatory.alert"
+    ANALYSIS_COMPLETED = "analysis.completed"
+    CONFLICT_DETECTED = "conflict.detected"
+    DIGEST = "digest.scheduled"
+
+
+class Webhook(Base, UUIDMixin, TimestampMixin):
+    """Webhook registration — orgs subscribe URLs to receive event notifications."""
+    __tablename__ = "webhooks"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    secret: Mapped[str | None] = mapped_column(String(255))  # HMAC signing secret
+    events: Mapped[list] = mapped_column(JSONB, nullable=False)  # list of WebhookEventType values
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Health
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status_code: Mapped[int | None] = mapped_column(Integer)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class WebhookDelivery(Base, UUIDMixin, TimestampMixin):
+    """Log of every webhook delivery attempt."""
+    __tablename__ = "webhook_deliveries"
+
+    webhook_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status_code: Mapped[int | None] = mapped_column(Integer)
+    response_body: Mapped[str | None] = mapped_column(Text)
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+
+
+class ScheduledDigest(Base, UUIDMixin, TimestampMixin):
+    """Scheduled digest configuration — periodic summaries delivered via webhook."""
+    __tablename__ = "scheduled_digests"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    schedule: Mapped[str] = mapped_column(String(50), nullable=False)  # daily_9am, weekly_monday, weekly_friday
+    webhook_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("webhooks.id", ondelete="SET NULL"))
+
+    # What to include
+    include_deadlines: Mapped[bool] = mapped_column(Boolean, default=True)
+    include_regulatory_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
+    include_pending_reviews: Mapped[bool] = mapped_column(Boolean, default=True)
+    include_matter_updates: Mapped[bool] = mapped_column(Boolean, default=True)
+    include_feedback_stats: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

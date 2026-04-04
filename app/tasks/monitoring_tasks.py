@@ -129,3 +129,21 @@ def check_regulatory_changes():
             logger.info("task_regulatory_check_completed", regulations_checked=total)
 
     _run_async(_check())
+
+
+@celery_app.task
+def process_scheduled_digests():
+    """Process all due scheduled digests. Runs hourly via beat."""
+    logger.info("task_digests_started")
+
+    async def _process():
+        from app.db.session import async_session_factory
+        from app.services.legal_features.digests import DigestService
+
+        async with async_session_factory() as db:
+            service = DigestService(db)
+            count = await service.process_all_due()
+            await db.commit()
+            logger.info("task_digests_completed", digests_sent=count)
+
+    _run_async(_process())

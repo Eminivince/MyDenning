@@ -13,6 +13,7 @@ from app.models.legal_features import (
     MonitoredRegulation, RegulatoryAlert,
     CitationValidation,
     Feedback,
+    Webhook, WebhookDelivery, ScheduledDigest,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "MonitoredRegulation", "RegulatoryAlert",
     "CitationValidation",
     "Feedback",
+    "Webhook", "WebhookDelivery", "ScheduledDigest",
 ]

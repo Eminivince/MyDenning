@@ -39,6 +39,10 @@ celery_app.conf.update(
             "task": "app.tasks.monitoring_tasks.check_regulatory_changes",
             "schedule": 3600.0 * 6,  # every 6 hours
         },
+        "process-scheduled-digests": {
+            "task": "app.tasks.monitoring_tasks.process_scheduled_digests",
+            "schedule": 3600.0,  # every hour
+        },
     },
 )
 

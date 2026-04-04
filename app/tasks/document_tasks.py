@@ -67,10 +67,34 @@ def process_document_task(self, document_id: str):
                     await es_client.index_chunks_bulk(es_docs)
 
                 await es_client.close()
+
+                # Fire webhook event
+                try:
+                    from app.services.legal_features.webhooks import WebhookService
+                    wh_service = WebhookService(db)
+                    await wh_service.fire_event(
+                        organization_id=doc.organization_id,
+                        event_type="document.processed",
+                        payload={"document_id": document_id, "title": doc.title, "status": "completed", "chunks": len(chunks)},
+                    )
+                except Exception:
+                    pass  # webhook failure should not break document processing
+
                 await db.commit()
 
                 logger.info("task_process_document_completed", document_id=document_id)
             except Exception as e:
+                # Fire failure webhook
+                try:
+                    from app.services.legal_features.webhooks import WebhookService
+                    wh_service = WebhookService(db)
+                    await wh_service.fire_event(
+                        organization_id=doc.organization_id if doc else uuid.UUID(int=0),
+                        event_type="document.failed",
+                        payload={"document_id": document_id, "error": str(e)},
+                    )
+                except Exception:
+                    pass
                 await db.rollback()
                 logger.error("task_process_document_failed", document_id=document_id, error=str(e))
                 raise

@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from app.api.deps import CurrentOrg, CurrentUser, DB
+from app.models.legal_features import ScheduledDigest
 from app.services.audit.service import AuditService
 
 router = APIRouter(tags=["legal-features"])
@@ -110,6 +111,24 @@ class CitationValidateRequest(BaseModel):
 class BatchCitationValidateRequest(BaseModel):
     citations: list[str]
     jurisdiction: str | None = None
+
+
+class WebhookCreateRequest(BaseModel):
+    name: str
+    url: str
+    events: list[str]  # document.processed, deadline.approaching, regulatory.alert, etc.
+    secret: str | None = None
+
+
+class DigestCreateRequest(BaseModel):
+    name: str
+    schedule: str  # daily_9am, weekly_monday, weekly_friday
+    webhook_id: str | None = None
+    include_deadlines: bool = True
+    include_regulatory_alerts: bool = True
+    include_pending_reviews: bool = True
+    include_matter_updates: bool = True
+    include_feedback_stats: bool = False
 
 
 class FeedbackRequest(BaseModel):
@@ -605,3 +624,137 @@ async def get_feedback_stats(
     from app.services.legal_features.feedback import FeedbackService
     service = FeedbackService(db)
     return await service.get_stats(org.id, resource_type)
+
+
+# ===================== WEBHOOKS =====================
+
+@router.post("/webhooks", status_code=status.HTTP_201_CREATED)
+async def register_webhook(
+    request: WebhookCreateRequest,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Register a webhook URL to receive event notifications.
+
+    Events: document.processed, document.failed, deadline.approaching,
+    deadline.overdue, regulatory.alert, analysis.completed, conflict.detected, digest.scheduled
+    """
+    from app.services.legal_features.webhooks import WebhookService
+    service = WebhookService(db)
+    webhook = await service.register(org.id, user.id, request.name, request.url, request.events, request.secret)
+    return {
+        "id": str(webhook.id), "name": webhook.name, "url": webhook.url,
+        "events": webhook.events, "is_active": webhook.is_active,
+    }
+
+
+@router.get("/webhooks")
+async def list_webhooks(user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
+    from app.services.legal_features.webhooks import WebhookService
+    service = WebhookService(db)
+    webhooks = await service.list_webhooks(org.id)
+    return [
+        {
+            "id": str(w.id), "name": w.name, "url": w.url, "events": w.events,
+            "is_active": w.is_active, "consecutive_failures": w.consecutive_failures,
+            "last_triggered_at": w.last_triggered_at.isoformat() if w.last_triggered_at else None,
+            "last_status_code": w.last_status_code,
+        }
+        for w in webhooks
+    ]
+
+
+@router.delete("/webhooks/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_webhook(webhook_id: uuid.UUID, user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
+    from app.services.legal_features.webhooks import WebhookService
+    service = WebhookService(db)
+    await service.delete(webhook_id)
+
+
+@router.post("/webhooks/{webhook_id}/reset")
+async def reset_webhook(webhook_id: uuid.UUID, user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
+    """Re-enable a webhook that was disabled after consecutive failures."""
+    from app.services.legal_features.webhooks import WebhookService
+    service = WebhookService(db)
+    webhook = await service.reset_webhook(webhook_id)
+    return {"id": str(webhook.id), "is_active": webhook.is_active, "consecutive_failures": webhook.consecutive_failures}
+
+
+@router.get("/webhooks/{webhook_id}/deliveries")
+async def get_webhook_deliveries(webhook_id: uuid.UUID, user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
+    from app.services.legal_features.webhooks import WebhookService
+    service = WebhookService(db)
+    deliveries = await service.get_deliveries(webhook_id)
+    return [
+        {
+            "id": str(d.id), "event_type": d.event_type, "success": d.success,
+            "status_code": d.status_code, "duration_ms": d.duration_ms,
+            "created_at": d.created_at.isoformat(),
+        }
+        for d in deliveries
+    ]
+
+
+# ===================== SCHEDULED DIGESTS =====================
+
+@router.post("/digests", status_code=status.HTTP_201_CREATED)
+async def create_digest(
+    request: DigestCreateRequest,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Create a scheduled digest — periodic summaries of deadlines, alerts, and activity.
+
+    Schedules: daily_9am, weekly_monday, weekly_friday.
+    Delivers via webhook if webhook_id is provided.
+    """
+    from app.services.legal_features.digests import DigestService
+    service = DigestService(db)
+    digest = await service.create_digest(
+        organization_id=org.id, user_id=user.id,
+        name=request.name, schedule=request.schedule,
+        webhook_id=uuid.UUID(request.webhook_id) if request.webhook_id else None,
+        include_deadlines=request.include_deadlines,
+        include_regulatory_alerts=request.include_regulatory_alerts,
+        include_pending_reviews=request.include_pending_reviews,
+        include_matter_updates=request.include_matter_updates,
+        include_feedback_stats=request.include_feedback_stats,
+    )
+    return {
+        "id": str(digest.id), "name": digest.name, "schedule": digest.schedule,
+        "is_active": digest.is_active,
+    }
+
+
+@router.get("/digests")
+async def list_digests(user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
+    from app.services.legal_features.digests import DigestService
+    service = DigestService(db)
+    digests = await service.list_digests(org.id)
+    return [
+        {
+            "id": str(d.id), "name": d.name, "schedule": d.schedule,
+            "is_active": d.is_active,
+            "last_sent_at": d.last_sent_at.isoformat() if d.last_sent_at else None,
+        }
+        for d in digests
+    ]
+
+
+@router.post("/digests/{digest_id}/trigger")
+async def trigger_digest(digest_id: uuid.UUID, user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
+    """Manually trigger a scheduled digest (for testing or on-demand)."""
+    from app.services.legal_features.digests import DigestService
+    service = DigestService(db)
+    payload = await service.generate_digest(digest_id)
+
+    # Deliver via webhook if configured
+    digest = await db.get(ScheduledDigest, digest_id)
+    if digest and digest.webhook_id:
+        from app.services.legal_features.webhooks import WebhookService
+        wh_service = WebhookService(db)
+        await wh_service.fire_event(org.id, "digest.scheduled", payload)
+
+    return payload
