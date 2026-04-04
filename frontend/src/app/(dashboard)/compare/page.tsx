@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { documents, playbooks, legalFeatures } from "@/lib/api/endpoints";
-import { GitCompare, Swords, Loader2, ChevronDown, ChevronRight, AlertTriangle, Shield, Target } from "lucide-react";
+import { documents, playbooks, legalFeatures, analysis } from "@/lib/api/endpoints";
+import { GitCompare, Swords, Loader2, ChevronDown, ChevronRight, AlertTriangle, Shield, Target, Download } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/cn";
 
@@ -298,10 +298,23 @@ export default function ComparePage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">Redline Summary</CardTitle>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <Badge variant="success">{redlineResult.additions} additions</Badge>
                       <Badge variant="destructive">{redlineResult.deletions} deletions</Badge>
                       <Badge variant="warning">{redlineResult.modifications} modifications</Badge>
+                      {redlineResult.id && (
+                        <Button variant="outline" size="sm" onClick={async () => {
+                          try {
+                            const { blob, filename } = await analysis.exportDocx(String(redlineResult.id));
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a"); a.href = url; a.download = filename;
+                            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          } catch { toast.error("Export failed"); }
+                        }}>
+                          <Download className="mr-1 h-3.5 w-3.5" />Word
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

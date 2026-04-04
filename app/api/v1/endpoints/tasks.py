@@ -51,6 +51,28 @@ async def create_task(request: TaskCreate, user: CurrentUser = None, org: Curren
     )
     db.add(task)
     await db.flush()
+
+    # Fire webhook if task was assigned to someone
+    if task.assigned_to_id:
+        try:
+            from app.services.legal_features.webhooks import WebhookService
+            wh_service = WebhookService(db)
+            await wh_service.fire_event(
+                organization_id=org.id,
+                event_type="analysis.completed",  # reuse generic event type
+                payload={
+                    "type": "task_assigned",
+                    "task_id": str(task.id),
+                    "title": task.title,
+                    "assigned_to_id": str(task.assigned_to_id),
+                    "priority": task.priority,
+                    "due_date": task.due_date.isoformat() if task.due_date else None,
+                    "matter_id": str(task.matter_id) if task.matter_id else None,
+                },
+            )
+        except Exception:
+            pass  # webhook failure should not block task creation
+
     return _task_dict(task)
 
 
@@ -104,7 +126,27 @@ async def approve_task(task_id: uuid.UUID, user: CurrentUser = None, org: Curren
         raise HTTPException(status_code=404, detail="Task not found")
     task.approved_by_id = user.id
     task.approved_at = datetime.now(timezone.utc)
+    task.status = TaskStatus.COMPLETED
+    task.completed_at = datetime.now(timezone.utc)
     await db.flush()
+
+    # Fire webhook for approval
+    try:
+        from app.services.legal_features.webhooks import WebhookService
+        wh_service = WebhookService(db)
+        await wh_service.fire_event(
+            organization_id=org.id,
+            event_type="analysis.completed",
+            payload={
+                "type": "task_approved",
+                "task_id": str(task.id),
+                "title": task.title,
+                "approved_by": str(user.id),
+            },
+        )
+    except Exception:
+        pass
+
     return _task_dict(task)
 
 

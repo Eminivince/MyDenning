@@ -24,6 +24,9 @@ class EventCreate(BaseModel):
     location: str | None = None
     attendee_ids: list[uuid.UUID] | None = None
     reminders: list[dict] | None = None  # [{minutes_before: 30, type: "notification"}]
+    is_recurring: bool = False
+    recurrence: str | None = None  # daily, weekly, biweekly, monthly
+    recurrence_count: int = 12  # how many instances to generate
 
 
 class EventUpdate(BaseModel):
@@ -37,23 +40,60 @@ class EventUpdate(BaseModel):
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_event(request: EventCreate, user: CurrentUser = None, org: CurrentOrg = None, db: DB = None):
-    event = CalendarEvent(
-        organization_id=org.id,
-        created_by_id=user.id,
-        matter_id=request.matter_id,
-        title=request.title,
-        description=request.description,
+    from datetime import timedelta
+
+    RECURRENCE_DELTAS = {
+        "daily": timedelta(days=1),
+        "weekly": timedelta(weeks=1),
+        "biweekly": timedelta(weeks=2),
+        "monthly": timedelta(days=30),  # approximate
+    }
+
+    base_args = dict(
+        organization_id=org.id, created_by_id=user.id, matter_id=request.matter_id,
+        title=request.title, description=request.description,
         event_type=EventType(request.event_type),
-        start_time=request.start_time,
-        end_time=request.end_time,
-        all_day=request.all_day,
-        location=request.location,
+        all_day=request.all_day, location=request.location,
         attendee_ids=[str(a) for a in request.attendee_ids] if request.attendee_ids else None,
         reminders=request.reminders,
     )
+
+    # Create the first event
+    event = CalendarEvent(
+        **base_args,
+        start_time=request.start_time, end_time=request.end_time,
+        is_recurring=request.is_recurring,
+        recurrence_rule=request.recurrence,
+    )
     db.add(event)
+
+    created_count = 1
+
+    # Expand recurring events
+    if request.is_recurring and request.recurrence and request.recurrence in RECURRENCE_DELTAS:
+        delta = RECURRENCE_DELTAS[request.recurrence]
+        duration = (request.end_time - request.start_time) if request.end_time else None
+        count = min(request.recurrence_count, 52)  # cap at 52 instances
+
+        for i in range(1, count):
+            offset = delta * i
+            instance_start = request.start_time + offset
+            instance_end = (request.end_time + offset) if request.end_time else None
+
+            instance = CalendarEvent(
+                **base_args,
+                start_time=instance_start, end_time=instance_end,
+                is_recurring=True, recurrence_rule=request.recurrence,
+            )
+            db.add(instance)
+            created_count += 1
+
     await db.flush()
-    return _event_dict(event)
+
+    result = _event_dict(event)
+    if created_count > 1:
+        result["recurring_instances_created"] = created_count
+    return result
 
 
 @router.get("")

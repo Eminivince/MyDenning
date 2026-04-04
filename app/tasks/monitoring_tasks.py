@@ -209,3 +209,51 @@ def send_calendar_reminders():
             logger.info("task_calendar_reminders_completed", events_checked=len(events), reminders_fired=fired)
 
     _run_async(_send())
+
+
+@celery_app.task
+def check_task_deadlines():
+    """Fire webhooks for tasks due in the next 24 hours. Runs hourly."""
+    logger.info("task_deadline_reminders_started")
+
+    async def _check():
+        from sqlalchemy import select, and_
+        from app.db.session import async_session_factory
+        from app.models.matter import Task, TaskStatus
+
+        async with async_session_factory() as db:
+            now = datetime.now(timezone.utc)
+            upcoming = await db.execute(
+                select(Task).where(and_(
+                    Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
+                    Task.due_date.isnot(None),
+                    Task.due_date > now,
+                    Task.due_date <= now + timedelta(hours=24),
+                ))
+            )
+            tasks = upcoming.scalars().all()
+            fired = 0
+            for task in tasks:
+                try:
+                    from app.services.legal_features.webhooks import WebhookService
+                    wh_service = WebhookService(db)
+                    await wh_service.fire_event(
+                        organization_id=task.organization_id,
+                        event_type="deadline.approaching",
+                        payload={
+                            "type": "task_due_soon",
+                            "task_id": str(task.id),
+                            "title": task.title,
+                            "due_date": task.due_date.isoformat(),
+                            "assigned_to_id": str(task.assigned_to_id) if task.assigned_to_id else None,
+                            "priority": task.priority,
+                            "hours_until": int((task.due_date - now).total_seconds() / 3600),
+                        },
+                    )
+                    fired += 1
+                except Exception:
+                    pass
+            await db.commit()
+            logger.info("task_deadline_reminders_completed", tasks_checked=len(tasks), fired=fired)
+
+    _run_async(_check())
