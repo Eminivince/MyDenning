@@ -91,6 +91,8 @@ export const legalSources = {
   adapters: () => api.get<any>("/legal-sources/adapters"),
   importSource: (externalId: string, adapterName: string) =>
     api.post<any>(`/legal-sources/import/${externalId}`, undefined),
+  starterPacks: () => api.get<any[]>("/legal-sources/starter-packs"),
+  importStarterPack: (packId: string) => api.post<any>(`/legal-sources/starter-packs/${packId}/import`),
 };
 
 // ===== Memory =====

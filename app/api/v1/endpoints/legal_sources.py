@@ -297,3 +297,48 @@ async def import_source_to_library(
         "source": adapter_name,
         "imported": True,
     }
+
+
+# ===================== STARTER PACKS =====================
+
+@router.get("/starter-packs")
+async def list_starter_packs(user: CurrentUser = None):
+    """List all available jurisdiction starter packs."""
+    from app.services.starter_packs.service import StarterPackService
+    return StarterPackService.list_packs()
+
+
+@router.post("/starter-packs/{pack_id}/import")
+async def import_starter_pack(
+    pack_id: str,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Import a jurisdiction starter pack into the organization's legal library.
+
+    Searches external legal databases for each authority in the pack and
+    imports the best match. Skips authorities that already exist.
+    This may take 30-60 seconds depending on the pack size.
+    """
+    from app.services.starter_packs.service import StarterPackService
+
+    service = StarterPackService(db)
+    result = await service.import_pack(pack_id, org.id, user.id)
+
+    audit = AuditService(db)
+    await audit.log(
+        organization_id=org.id,
+        user_id=user.id,
+        action="import_starter_pack",
+        resource_type="legal_source",
+        description=f"Imported starter pack: {result['pack_name']} ({result['imported_count']} sources)",
+        metadata={
+            "pack_id": pack_id,
+            "imported": result["imported_count"],
+            "skipped": result["skipped_count"],
+            "failed": result["failed_count"],
+        },
+    )
+
+    return result

@@ -9,8 +9,78 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { memory, legalSources } from "@/lib/api/endpoints";
 import { useTheme } from "next-themes";
-import { Save, Loader2, Sun, Moon, Monitor } from "lucide-react";
+import { Save, Loader2, Sun, Moon, Monitor, Globe, Download, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+
+function StarterPacksSection() {
+  const { data: packs, isLoading } = useQuery({ queryKey: ["starter-packs"], queryFn: () => legalSources.starterPacks() });
+  const queryClient = useQueryClient();
+  const [importing, setImporting] = useState<string | null>(null);
+  const [imported, setImported] = useState<Set<string>>(new Set());
+
+  async function handleImport(packId: string) {
+    setImporting(packId);
+    try {
+      const result = await legalSources.importStarterPack(packId);
+      setImported((prev) => new Set(prev).add(packId));
+      toast.success(`Imported ${result.imported_count} sources from ${result.pack_name}. ${result.skipped_count} skipped, ${result.failed_count} failed.`);
+    } catch (err: any) {
+      toast.error(err.detail || "Import failed");
+    } finally {
+      setImporting(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Jurisdiction Starter Packs</CardTitle>
+        <CardDescription>One-click import of key statutes, landmark cases, and regulations per jurisdiction</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        ) : !packs?.length ? (
+          <p className="text-sm text-muted-foreground">No starter packs available</p>
+        ) : (
+          <div className="space-y-3">
+            {packs.map((pack: any) => (
+              <div key={pack.id} className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex items-center gap-3">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">{pack.name}</p>
+                    <p className="text-xs text-muted-foreground">{pack.description?.slice(0, 80)}...</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">{pack.jurisdiction}</Badge>
+                      <span className="text-[10px] text-muted-foreground">{pack.source_count} sources</span>
+                    </div>
+                  </div>
+                </div>
+                {imported.has(pack.id) ? (
+                  <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />Imported
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleImport(pack.id)}
+                    disabled={importing === pack.id}
+                  >
+                    {importing === pack.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1 h-3.5 w-3.5" />}
+                    {importing === pack.id ? "Importing..." : "Import"}
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -106,6 +176,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Starter Packs */}
+      <StarterPacksSection />
 
       {/* Legal Source Adapters */}
       {adapters && (
