@@ -69,6 +69,8 @@ export const playbooks = {
   get: (id: string) => api.get<T.Playbook>(`/playbooks/${id}`),
   create: (data: any) => api.post<T.Playbook>("/playbooks", data),
   update: (id: string, data: any) => api.patch<T.Playbook>(`/playbooks/${id}`, data),
+  templates: () => api.get<any[]>("/playbooks/templates/list"),
+  useTemplate: (templateId: string) => api.post<T.Playbook>(`/playbooks/templates/${templateId}/use`),
   delete: (id: string) => api.delete(`/playbooks/${id}`),
   addClause: (id: string, data: any) => api.post<any>(`/playbooks/${id}/clauses`, data),
 };

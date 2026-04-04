@@ -166,3 +166,81 @@ async def delete_playbook(
 
     playbook.is_active = False
     await db.flush()
+
+
+# ===================== TEMPLATES =====================
+
+@router.get("/templates/list")
+async def list_templates(user: CurrentUser = None):
+    """List all available pre-built playbook templates."""
+    from app.services.templates.registry import PLAYBOOK_TEMPLATES
+
+    return [
+        {
+            "id": template_id,
+            "name": tpl["name"],
+            "description": tpl["description"],
+            "document_type": tpl["document_type"],
+            "jurisdiction": tpl["jurisdiction"],
+            "clause_count": len(tpl.get("clauses", [])),
+        }
+        for template_id, tpl in PLAYBOOK_TEMPLATES.items()
+    ]
+
+
+@router.post("/templates/{template_id}/use", response_model=PlaybookOut, status_code=status.HTTP_201_CREATED)
+async def use_template(
+    template_id: str,
+    user: CurrentUser = None,
+    org: CurrentOrg = None,
+    db: DB = None,
+):
+    """Instantiate a pre-built template into the organization's playbook library.
+
+    Creates a full playbook with all clauses from the template. The organization
+    can then customize positions, language, and thresholds to match their standards.
+    """
+    from app.services.templates.registry import PLAYBOOK_TEMPLATES
+    from app.models.playbook import ClausePosition
+
+    tpl = PLAYBOOK_TEMPLATES.get(template_id)
+    if not tpl:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Template '{template_id}' not found")
+
+    playbook = Playbook(
+        organization_id=org.id,
+        created_by_id=user.id,
+        name=tpl["name"],
+        description=tpl["description"],
+        document_type=tpl["document_type"],
+        jurisdiction=tpl.get("jurisdiction"),
+    )
+    db.add(playbook)
+    await db.flush()
+
+    for clause_data in tpl.get("clauses", []):
+        clause = PlaybookClause(
+            playbook_id=playbook.id,
+            clause_type=clause_data["clause_type"],
+            clause_name=clause_data["clause_name"],
+            position=ClausePosition(clause_data.get("position", "preferred")),
+            standard_language=clause_data["standard_language"],
+            fallback_language=clause_data.get("fallback_language"),
+            unacceptable_patterns=clause_data.get("unacceptable_patterns"),
+            negotiation_notes=clause_data.get("negotiation_notes"),
+            risk_if_deviated=clause_data.get("risk_if_deviated"),
+            approval_required_if=clause_data.get("approval_required_if"),
+            importance_weight=clause_data.get("importance_weight", 1.0),
+            order_index=clause_data.get("order_index", 0),
+        )
+        db.add(clause)
+
+    await db.flush()
+
+    # Reload with clauses
+    result = await db.execute(
+        select(Playbook)
+        .where(Playbook.id == playbook.id)
+        .options(selectinload(Playbook.clauses))
+    )
+    return result.scalar_one()
